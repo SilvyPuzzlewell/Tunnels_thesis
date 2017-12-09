@@ -1,0 +1,8 @@
+max_step 0.05
+iterations 1000000
+probe_radius 1.0
+test_sphere_radius 5
+start_x 74.5
+start_y 26.8
+start_z 26.8 
+coordinates_file coords_1BL8.txt

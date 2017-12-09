@@ -1,0 +1,124 @@
+tree size at end: 48240
+found tunnels count: 3
+detected dupplicate paths count: 153
+main part running time: 177
+time spent searching nearest neighbor: 81
+time spent optimizing tunnels: 39
+time spent centring nodes: 22
+time spent collision checking: 3
+time spent checking duplications: 0
+
+tunnel 1 found in 98% of tested frames
+tunnel 2 found in 88% of tested frames
+tunnel 3 found in 12% of tested frames
+
+tree size at end: 629052
+found tunnels count: 25
+detected dupplicate paths count: 4703
+main part running time: 11801
+time spent searching nearest neighbor: -1308
+time spent optimizing tunnels: -1826
+time spent centring nodes: 815
+time spent collision checking: 133
+time spent checking duplications: 0
+
+tunnel 1 found in 93.1932% of tested frames
+tunnel 2 found in 74.8749% of tested frames
+tunnel 3 found in 22.8228% of tested frames
+tunnel 4 found in 6.00601% of tested frames
+tunnel 5 found in 2.6026% of tested frames
+tunnel 6 found in 10.01% of tested frames
+tunnel 7 found in 1.6016% of tested frames
+tunnel 8 found in 0.1001% of tested frames
+tunnel 9 found in 0.1001% of tested frames
+tunnel 10 found in 2.002% of tested frames
+tunnel 11 found in 0.600601% of tested frames
+tunnel 12 found in 1.3013% of tested frames
+tunnel 13 found in 3.3033% of tested frames
+tunnel 14 found in 62.1622% of tested frames
+tunnel 15 found in 2.4024% of tested frames
+tunnel 16 found in 0.600601% of tested frames
+tunnel 17 found in 9.30931% of tested frames
+tunnel 18 found in 1.7017% of tested frames
+tunnel 19 found in 0.1001% of tested frames
+tunnel 20 found in 14.2142% of tested frames
+tunnel 21 found in 0.2002% of tested frames
+tunnel 22 found in 2.002% of tested frames
+tunnel 23 found in 0.2002% of tested frames
+tunnel 24 found in 3.7037% of tested frames
+tunnel 25 found in 0.3003% of tested frames
+
+tree size at end: 11932
+found tunnels count: 4
+detected dupplicate paths count: 27
+main part running time: 30
+time spent searching nearest neighbor: 13
+time spent optimizing tunnels: 5
+time spent centring nodes: 4
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 100% of tested frames
+tunnel 2 found in 10% of tested frames
+tunnel 3 found in 20% of tested frames
+tunnel 4 found in 30% of tested frames
+
+tree size at end: 11695
+found tunnels count: 3
+detected dupplicate paths count: 22
+main part running time: 27
+time spent searching nearest neighbor: 12
+time spent optimizing tunnels: 4
+time spent centring nodes: 3
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 80% of tested frames
+tunnel 2 found in 90% of tested frames
+tunnel 3 found in 20% of tested frames
+
+tree size at end: 11709
+found tunnels count: 3
+detected dupplicate paths count: 22
+main part running time: 27
+time spent searching nearest neighbor: 13
+time spent optimizing tunnels: 4
+time spent centring nodes: 2
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 90% of tested frames
+tunnel 2 found in 10% of tested frames
+tunnel 3 found in 70% of tested frames
+
+tree size at end: 12525
+found tunnels count: 5
+detected dupplicate paths count: 24
+main part running time: 30
+time spent searching nearest neighbor: 13
+time spent optimizing tunnels: 5
+time spent centring nodes: 4
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 80% of tested frames
+tunnel 2 found in 20% of tested frames
+tunnel 3 found in 70% of tested frames
+tunnel 4 found in 20% of tested frames
+tunnel 5 found in 10% of tested frames
+
+tree size at end: 11553
+found tunnels count: 4
+detected dupplicate paths count: 23
+main part running time: 792
+time spent searching nearest neighbor: 258
+time spent optimizing tunnels: 154
+time spent centring nodes: 134
+time spent collision checking: 171
+time spent checking duplications: 0
+
+tunnel 1 found in 80% of tested frames
+tunnel 2 found in 60% of tested frames
+tunnel 3 found in 30% of tested frames
+tunnel 4 found in 30% of tested frames
+
