@@ -1,12 +1,14 @@
 #!/bin/bash
-if [ -d ./found_tunnels/tunnels0 ]; then
-	rm -r ./found_tunnels/tunnels0
-fi
+if [ -d "$DIRECTORY" ]; then
+  # Control will enter here if $DIRECTORY exists.
+firm -r ./found_tunnels/tunnels0
+
+rm -r ./found_tunnels/tunnels0
 mkdir ./found_tunnels/tunnels0
 
 cd ./found_tunnels/tunnels0
 date > date_pre.txt
-cd ~/bak_repository/dynamic_tunnels
+cd ~/Bak/dynamic_tunnels
 
 ./rrt
 cd ./found_tunnels/tunnels0

@@ -122,3 +122,81 @@ tunnel 2 found in 60% of tested frames
 tunnel 3 found in 30% of tested frames
 tunnel 4 found in 30% of tested frames
 
+tree size at end: 13186
+found tunnels count: 2
+detected dupplicate paths count: 25
+main part running time: 28
+time spent searching nearest neighbor: 13
+time spent optimizing tunnels: 4
+time spent centring nodes: 3
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 100% of tested frames
+tunnel 2 found in 50% of tested frames
+
+tree size at end: 12469
+found tunnels count: 2
+detected dupplicate paths count: 31
+main part running time: 29
+time spent searching nearest neighbor: 12
+time spent optimizing tunnels: 5
+time spent centring nodes: 3
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 100% of tested frames
+tunnel 2 found in 60% of tested frames
+
+tree size at end: 12558
+found tunnels count: 7
+detected dupplicate paths count: 25
+main part running time: 30
+time spent searching nearest neighbor: 13
+time spent optimizing tunnels: 5
+time spent centring nodes: 4
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 80% of tested frames
+tunnel 2 found in 20% of tested frames
+tunnel 3 found in 10% of tested frames
+tunnel 4 found in 60% of tested frames
+tunnel 5 found in 10% of tested frames
+tunnel 6 found in 10% of tested frames
+tunnel 7 found in 10% of tested frames
+
+tree size at end: 12451
+found tunnels count: 7
+detected dupplicate paths count: 25
+main part running time: 29
+time spent searching nearest neighbor: 13
+time spent optimizing tunnels: 5
+time spent centring nodes: 4
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 80% of tested frames
+tunnel 2 found in 70% of tested frames
+tunnel 3 found in 20% of tested frames
+tunnel 4 found in 10% of tested frames
+tunnel 5 found in 10% of tested frames
+tunnel 6 found in 10% of tested frames
+tunnel 7 found in 10% of tested frames
+
+tree size at end: 11957
+found tunnels count: 5
+detected dupplicate paths count: 27
+main part running time: 29
+time spent searching nearest neighbor: 13
+time spent optimizing tunnels: 5
+time spent centring nodes: 3
+time spent collision checking: 0
+time spent checking duplications: 0
+
+tunnel 1 found in 80% of tested frames
+tunnel 2 found in 50% of tested frames
+tunnel 3 found in 50% of tested frames
+tunnel 4 found in 10% of tested frames
+tunnel 5 found in 10% of tested frames
+

@@ -195,17 +195,18 @@ bool create_N_representation(shared_ptr<Path> tunnel){
 				cout << "distance from tunnel root: " <<  compute_metric_eucleidean(tunnel_map[index]->get_location_coordinates(), tunnel_root_coordinate) << endl;
 				cout << "z_radius " << Z_start_radius << endl;
 				cout << "counter " << counter << endl;
-				exit(0);
 			}
 		}
 		double cur_distance = compute_metric_eucleidean(tunnel_map[index]->get_location_coordinates(), tunnel_map[tunnel->get_beginning_index()]->get_location_coordinates()) - tunnel_offset;
 		//compute distance of current node from the tunnel beginning node
-		cout << "debug" <<endl;
-		cout << "tunnel_offset " << tunnel_offset << endl;
-		cout << "cur distance " <<  cur_distance << endl;
-		cout << "extreme point distance " << extreme_point_distance << endl;
-		cout << "last node" << endpoint_index << endl;
-		cout << "endpoit" << tunnel->get_endpoint_index() << endl;
+		if(DEBUG_ENABLED){
+			cout << "debug" <<endl;
+			cout << "tunnel_offset " << tunnel_offset << endl;
+			cout << "cur distance " <<  cur_distance << endl;
+			cout << "extreme point distance " << extreme_point_distance << endl;
+			cout << "last node" << endpoint_index << endl;
+			cout << "endpoit" << tunnel->get_endpoint_index() << endl;
+		}
 		if(TESTING_ENABLED){
 			if(cur_distance > extreme_point_distance){
 				cout << "TEST ERROR: node in tunnel is farther from center than extreme point in duplication check!" << endl;
@@ -224,11 +225,12 @@ bool create_N_representation(shared_ptr<Path> tunnel){
 		//std::cout << "cur " << cur_distance << " max " << extreme_point_distance << std::endl;
 
 		//adds current nodes coordinates into vector sum representing center of gravity of current node's interval
-		
-		cout << "test2" << endl; 
-		cout << "interval " << interval << endl;
-		cout << "interval unfloored " << (cur_distance / extreme_point_distance) * N << endl;
-		cout << "N " << N << endl;
+		if(DEBUG_ENABLED){
+			cout << "test2" << endl; 
+			cout << "interval " << interval << endl;
+			cout << "interval unfloored " << (cur_distance / extreme_point_distance) * N << endl;
+			cout << "N " << N << endl;
+		}
 		
 		if(N_counts[interval] == 0){
 			delete [] N_representation[interval];
