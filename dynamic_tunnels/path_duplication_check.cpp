@@ -84,7 +84,6 @@ int find_extreme_point(shared_ptr<Path> tunnel, double* center, int start_index,
 //Uses Z_interval parameters for not counting parts around beginning or ending. If used, delegation into intervals will start at first unremoved node and end at last node before the removed ones
 //at the end.
 bool create_N_representation(shared_ptr<Path> tunnel){
-	cout << "entering N_representation creation!!" << endl;
 	int endpoint_index = tunnel->get_endpoint_index();
 	int start_index = tunnel->get_beginning_index();
 	std::map<int, std::shared_ptr<vertex>> tunnel_map = tunnel->get_vertices();
@@ -190,11 +189,12 @@ bool create_N_representation(shared_ptr<Path> tunnel){
 	while(true){
 		//test
 		if(TESTING_ENABLED){
-			if(compute_metric_eucleidean(tunnel_map[index]->get_location_coordinates(), tunnel_root_coordinate)  <= Z_start_radius){
+			if(compute_metric_eucleidean(tunnel_map[index]->get_location_coordinates(), tunnel_root_coordinate)  <= Z_start_radius && are_endings_cut){
 				cout << "TEST ERROR: node in z_radius in duplication check" << endl;
 				cout << "distance from tunnel root: " <<  compute_metric_eucleidean(tunnel_map[index]->get_location_coordinates(), tunnel_root_coordinate) << endl;
 				cout << "z_radius " << Z_start_radius << endl;
 				cout << "counter " << counter << endl;
+				exit(0);
 			}
 		}
 		double cur_distance = compute_metric_eucleidean(tunnel_map[index]->get_location_coordinates(), tunnel_map[tunnel->get_beginning_index()]->get_location_coordinates()) - tunnel_offset;
@@ -330,7 +330,6 @@ void N_representation(std::vector<shared_ptr<Path>> existing_paths, shared_ptr<P
 }
 
 int is_tunnel_duplicated(shared_ptr<Path> checked_path, std::vector<shared_ptr<Path>> existing_paths){
-	cout << "entering tunnel duplication check!!" << endl;
 	if(existing_paths.size() == 0){
 		decide_N(existing_paths, checked_path);
 		N_representation(existing_paths, checked_path);

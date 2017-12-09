@@ -1,2 +1,8 @@
 
 dynamic_tunnels/Frames/
+
+dynamic_tunnels/found_tunnels/
+
+dynamic_tunnels/rrt
+
+dynamic_tunnels/runtime_stats\.txt
