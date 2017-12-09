@@ -11,7 +11,7 @@ using namespace std;
 
 extern int world_size_x; extern int world_size_y; extern int world_size_z; extern int world_size_x_shift; extern int world_size_y_shift; extern int world_size_z_shift;
 
-
+extern bool TESTING_ENABLED;
 //initial position and goal coordinates
 extern double qix;
 extern double qiy;
@@ -22,7 +22,7 @@ extern double min_step; // maximum distance of new node from its parent
 extern int iterations;
 extern double min_distance_to_goal;
 extern bool use_caver_dupcheck;
-extern int inside_sampling_bias;
+extern double inside_sampling_bias;
 
 
 

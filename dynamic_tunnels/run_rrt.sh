@@ -1,6 +1,6 @@
 #!/bin/bash
 cd ./found_tunnels
-for i in {0..50..1}
+for i in {0..100..1}
   do
   	echo $i
 	DIRECTORY="tunnels$i"
@@ -15,7 +15,7 @@ for i in {0..50..1}
 cd ..
 date
 rm runtime_stats.txt
-for i in {0..50..1}
+for i in {0..100..1}
   do
     echo "iteration $i"
   	./rrt $i

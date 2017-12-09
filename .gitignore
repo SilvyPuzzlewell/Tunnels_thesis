@@ -14,3 +14,5 @@ analysis/found_tunnels/
 analysis/config\.txt\.save
 
 visualization/
+
+dynamic_tunnels/computed_at_night/

@@ -1,9 +1,13 @@
 import os
 import numpy as np
+import sys
 
 base_path = "/home/fif/bak_repository/analysis/"
 stats_file_path = base_path + "stats.txt"
+
 output_file_path = base_path + "processed_stats.txt"
+if(len(sys.argv) > 1):
+	output_file_path = base_path + sys.argv[1]
 caver_tunnels_path = base_path + "caver_tunnels"
 
 stats_file = open(stats_file_path, "r")

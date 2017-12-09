@@ -1,16 +1,19 @@
 import numpy
 import math 
 import os
+import re
 from scipy import spatial as sp
 from glob import glob
 
 #here must tunnels found by caver be copied
 caver_tunnels_path = "/home/fif/bak_repository/analysis/caver_tunnels"
 
-rrt_tunnels_base_path = "/home/ron/Bak/dynamic_tunnels/found_tunnels/"
+rrt_tunnels_base_path = "/home/fif/bak_repository/analysis/found_tunnels/"
 rrt_tunnels_path = rrt_tunnels_base_path + "*/"
 #naming converntion for tunnel directories, the prefix after which the tunnel number is
 rrt_tunnels_namepattern = rrt_tunnels_base_path + "tunnels"
+
+VALID_TUNNEL_PATTERN = re.compile("(trajectory\d+\.pdb)|(\d+)")
 
 
 def compute_distance(array1, array2):
@@ -31,15 +34,16 @@ def init_kd_trees(path, directory):
 	kd_trees = []
 	tree_data = []
 	caver_counter = 0
+
+
 	for tunnel in directory:
 		data = open(path + "/" + directory[caver_counter], "r")
-		for tunnel_line in data:
+		if not VALID_TUNNEL_PATTERN.match(directory[caver_counter]):
+			data.close()
+			caver_counter += 1
+			continue
+		for tunnel_line in data:						
 			tunnel_data = line_to_numpy(tunnel_line)
-			if len(tunnel_data) == 0:
-				print(data)
-				print("\n" + path + "/" + directory[caver_counter])
-				print("theres some stupid shit in that folder, clean it")
-				exit()
 			tree_data.append(tunnel_data)
 		search_tree = sp.cKDTree(tree_data, copy_data="true")
 		kd_trees.append(search_tree)
@@ -88,7 +92,11 @@ for iteration_c in iterations: #iterating through folders containing tunnels fou
 	my_kd_trees = init_kd_trees(my_tunnels_path, my_tunnels)
 
 	for file in my_tunnels: #iterating through individual tunnels found in one run of tunnel detection algorithm
+		if not VALID_TUNNEL_PATTERN.match(file):
+			print("invalid file " + file)
+			continue
 		beginning = file[:10]
+
 		file_number = ""
 		if beginning == "trajectory": #to print in stats
 			file_end = file[10:]
@@ -98,7 +106,7 @@ for iteration_c in iterations: #iterating through folders containing tunnels fou
 				file_number = file_number + c
 		else:
 			continue
-
+		
 		my_tunnel = open(my_tunnels_path + "/" + file, "r")
 
 		tunnel_distance = 0
@@ -110,6 +118,8 @@ for iteration_c in iterations: #iterating through folders containing tunnels fou
 		for n in range(0, len(caver_kd_trees)): #finding shortest distance in of current tunnel by iterating through individual tunnels found by caver algorithm
 			dist = file_to_file_distance(my_tunnel, caver_kd_trees[n])
 			caver_tunnel = open(caver_tunnels_path + "/" + caver_tunnels[n], "r")
+			print("here " + str(counter))
+			print(len(my_kd_trees))
 			dist2 = file_to_file_distance(caver_tunnel, my_kd_trees[counter])
 			caver_tunnel.close()
 			

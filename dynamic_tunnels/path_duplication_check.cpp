@@ -16,8 +16,8 @@ double Z_start_radius = 1;
 double Z_end_radius = 1;
 double MIN_VALID_INTERTUNNEL_DISTANCE = 15;
 
-bool TESTING_ENABLED = true;
-bool DEBUG_ENABLED = true;
+
+bool DEBUG_ENABLED = false;
 
 
 //decides if node lies in the z interval sphere

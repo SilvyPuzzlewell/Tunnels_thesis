@@ -41,6 +41,8 @@ shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> parent
   double collision_check_step, int parent_index);
 void backtrack_process_path(shared_ptr<vertex> new_vertex );
 
+
+
 bool found = false;
 bool is_finished = false;
 std::vector <shared_ptr<Path>> paths;        //here are the fpund paths kept, all nodes in them are copied, therefore there isn't problem with deleting
@@ -252,12 +254,16 @@ bool is_in_obstacle(double* loc_coord, double radius, int check_with_blocking_sp
 double* sample(int iterations_counter){
   double vertX; double vertY; double vertZ;
   double* loc_coord = new double[3];
+  int counter = 0;
     while(true){
       vertX = (((double) rand() / (double) RAND_MAX) * (world_size_x)) + world_size_x_shift;
       vertY = (((double) rand() / (double) RAND_MAX) * (world_size_y)) + world_size_y_shift;
       vertZ = (((double) rand() / (double) RAND_MAX) * (world_size_z)) + world_size_z_shift;
       loc_coord[0] = vertX; loc_coord[1] =  vertY; loc_coord[2] = vertZ;
-      if(iterations_counter % inside_sampling_bias == 0 || is_in_obstacle(loc_coord, test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) break;
+      double r = ((double) rand() / (RAND_MAX));
+      counter++;
+      //cout << "test " << counter << " r "<< r << " colliding " << is_in_obstacle(loc_coord, test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES) << " bias " << inside_sampling_bias << endl;
+      if(r > inside_sampling_bias || is_in_obstacle(loc_coord, test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) break;
     }
  return loc_coord;
 }
@@ -303,21 +309,22 @@ void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_co
   int parent_index = find_nearest_vertex(sampled_coords, kDtree_passed);
   shared_ptr<vertex> parent = parent_tree->get_node_pointer(parent_index); //indices mapping is kept 1:1
   shared_ptr<vertex> new_vertex = make_shared<vertex>(sampled_coords, parent,tree_index, probe_radius, get_current_frame(), true);
+  //todo - redo so it adds stuff to the trees in the step function, interpolation can lead to different scenarios with one or more new nodes
   new_vertex = step(new_vertex, parent, min_step, 1, parent_index);
        //function for adding next point to graph points and sending signals to end iterating, use whichever you want                                                                                     //new_vertex is expected to be deleted if step_success_flag is set false, new vertex is added to                                                                                                     //both local and global coordinate representation, and only to local kd tree, the local kd tree is kept because o                                                                                      //the need to track local kd tree when deleting parts of it  
   if(step_success_flag){
     if(get_current_frame() > 1){
-      if(parent->is_valid_in_frame(get_current_frame())){ //because new node must be connected to vertex valid in the same frame, previous cannot be used cause there is no reasonable way to backward check frame connectibility
-        parent->add_child_pointer(new_vertex, false); //adds index of
-        local_priority_kdTree_coordinates->add_node(new_vertex);
-        add_to_tree(new_vertex->get_location_coordinates(), tree_index, local_priority_kdTree);
-      }
-      else {step_success_flag = false;}
-    } else {
-      parent->add_child_pointer(new_vertex, false); //adds index of
-      local_priority_kdTree_coordinates->add_node(new_vertex);
-      add_to_tree(new_vertex->get_location_coordinates(), tree_index, local_priority_kdTree);
-    }
+      //should be valid always, so added into TEST case
+      if(TESTING_ENABLED){
+        if(!parent->is_valid_in_frame(get_current_frame())){
+          cout << "TEST ERROR: STEP: parent not valid in current frame!" <<endl;
+          exit(0);
+        }
+      }        
+    } 
+    parent->add_child_pointer(new_vertex, false); //adds index of
+    local_priority_kdTree_coordinates->add_node(new_vertex);
+    add_to_tree(new_vertex->get_location_coordinates(), tree_index, local_priority_kdTree);   
     tree_index++;
     if(termination_check(new_vertex->get_location_coordinates())){
       backtrack_process_path(new_vertex);       
@@ -961,12 +968,12 @@ shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neares
   //basic version without any interpolation
 
   //if the distance is larger than the max step length, the node is moved to the max step 
+  
 	if(l > goal_distance){
 	 //geometric computation of new coordiantes which satisfy the maximal distance of generated point to nearest atom in rr tree
 	 new_x = x_differential - kx * cos(alfa) * cos(beta) * l_from_source_to_goal;
 	 new_y = y_differential - ky * cos(alfa) * sin(beta) * l_from_source_to_goal;
 	 new_z = z_differential - kz * sin(alfa) * l_from_source_to_goal;
- 
 	 new_vertex->get_location_coordinates()[0] = new_x + nearest_neighbor_vertex->get_location_coordinates()[0]; new_vertex->get_location_coordinates()[1] = new_y + nearest_neighbor_vertex->get_location_coordinates()[1]; new_vertex->get_location_coordinates()[2] = new_z + nearest_neighbor_vertex->get_location_coordinates()[2];
   }
   if(is_in_obstacle(new_vertex->get_location_coordinates(), probe_radius, CHECK_WITH_BLOCKING_SPHERES)){

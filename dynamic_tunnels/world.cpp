@@ -25,6 +25,7 @@ AABBTreeSphere* protein_tree;
 AABBTreeSphere* blocking_spheres_tree;
 vector<Ball*> blocking_spheres;
 
+bool TESTING_ENABLED = true;
 
 double REPEATED_RUN_ITERATIONS_COEFFICIENT = 0.5;
 int world_size_x = 100; int world_size_y = 100; int world_size_z = 100; int world_size_x_shift = 0; int world_size_y_shift = 0; int world_size_z_shift = 0;
@@ -43,7 +44,7 @@ bool is_loaded_from_framesdir;
 double probe_radius; //radius of sphere protein probe 
 double test_sphere_radius; // radius of sphere used to find if point is inside protein structure
 bool use_caver_dupcheck;
-int inside_sampling_bias;
+double inside_sampling_bias;
 //----
 
 //---- global variables used in whole program
@@ -155,7 +156,7 @@ void load_parameters(string config_filename){
   }
   file >> dummy; file >> value;
   if(!(file.eof())){
-    inside_sampling_bias = stoi(value, NULL);
+    inside_sampling_bias = stod(value, NULL);
     
   } else {
     inside_sampling_bias = 3;
