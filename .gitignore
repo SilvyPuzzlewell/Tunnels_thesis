@@ -6,3 +6,11 @@ dynamic_tunnels/found_tunnels/
 dynamic_tunnels/rrt
 
 dynamic_tunnels/runtime_stats\.txt
+
+analysis/3_4_2017/
+
+analysis/found_tunnels/
+
+analysis/config\.txt\.save
+
+visualization/

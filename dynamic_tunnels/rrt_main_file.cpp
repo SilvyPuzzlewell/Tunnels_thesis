@@ -937,18 +937,20 @@ void label_used_nodes(shared_ptr<Path> path, int path_index){
   }
 }
 
-shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> parent, double goal_distance, 
+shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest_neighbor_vertex, double goal_distance, 
   double collision_check_step, int parent_index){
  // print_vertex_coordinates(destination);
   static int counter = 0;
   
-	double x_differential = new_vertex->get_location_coordinates()[0] - parent->get_location_coordinates()[0]; double kx = signum(x_differential); //program is using differential coordinates instead of absolute ones
-	double y_differential = new_vertex->get_location_coordinates()[1] - parent->get_location_coordinates()[1]; double ky = signum(y_differential); 
-	double z_differential = new_vertex->get_location_coordinates()[2] - parent->get_location_coordinates()[2]; double kz = signum(z_differential); 
+  //compute differential coordinates
+	double x_differential = new_vertex->get_location_coordinates()[0] - nearest_neighbor_vertex->get_location_coordinates()[0]; double kx = signum(x_differential); //program is using differential coordinates instead of absolute ones
+	double y_differential = new_vertex->get_location_coordinates()[1] - nearest_neighbor_vertex->get_location_coordinates()[1]; double ky = signum(y_differential); 
+	double z_differential = new_vertex->get_location_coordinates()[2] - nearest_neighbor_vertex->get_location_coordinates()[2]; double kz = signum(z_differential); 
     
 
-	double l = compute_metric_eucleidean(new_vertex->get_location_coordinates(),parent->get_location_coordinates(), 3);        //distance of generated point(source) from nearest atom(destination)
-	double l_planar = compute_metric_eucleidean(new_vertex->get_location_coordinates(),parent->get_location_coordinates(), 2); //distance of generated point from nearest atom in xy projection
+
+	double l = compute_metric_eucleidean(new_vertex->get_location_coordinates(),nearest_neighbor_vertex->get_location_coordinates(), 3);        //distance of generated point(source) from nearest atom(destination)
+	double l_planar = compute_metric_eucleidean(new_vertex->get_location_coordinates(),nearest_neighbor_vertex->get_location_coordinates(), 2); //distance of generated point from nearest atom in xy projection
 	double l_from_source_to_goal = l - goal_distance;                                                               //distance by which the generated point is moved towards the nearest atom
   double alfa = atan(abs(z_differential) / l_planar);                                                             //angle of vertical and horizontal part of source to destiation trajectory
   double beta; x_differential != 0 ? beta = atan(abs(y_differential) / abs(x_differential)) : beta = 0;           //angle of planar parts 
@@ -956,13 +958,16 @@ shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> parent
   double new_x; double new_y; double new_z;
 
 
-	if(!(l <= goal_distance)){
+  //basic version without any interpolation
+
+  //if the distance is larger than the max step length, the node is moved to the max step 
+	if(l > goal_distance){
 	 //geometric computation of new coordiantes which satisfy the maximal distance of generated point to nearest atom in rr tree
 	 new_x = x_differential - kx * cos(alfa) * cos(beta) * l_from_source_to_goal;
 	 new_y = y_differential - ky * cos(alfa) * sin(beta) * l_from_source_to_goal;
 	 new_z = z_differential - kz * sin(alfa) * l_from_source_to_goal;
  
-	 new_vertex->get_location_coordinates()[0] = new_x + parent->get_location_coordinates()[0]; new_vertex->get_location_coordinates()[1] = new_y + parent->get_location_coordinates()[1]; new_vertex->get_location_coordinates()[2] = new_z + parent->get_location_coordinates()[2];
+	 new_vertex->get_location_coordinates()[0] = new_x + nearest_neighbor_vertex->get_location_coordinates()[0]; new_vertex->get_location_coordinates()[1] = new_y + nearest_neighbor_vertex->get_location_coordinates()[1]; new_vertex->get_location_coordinates()[2] = new_z + nearest_neighbor_vertex->get_location_coordinates()[2];
   }
   if(is_in_obstacle(new_vertex->get_location_coordinates(), probe_radius, CHECK_WITH_BLOCKING_SPHERES)){
     //static int deleted = 1;

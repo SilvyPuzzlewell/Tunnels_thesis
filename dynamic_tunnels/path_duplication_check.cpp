@@ -12,8 +12,8 @@
 
 int N = 50; //default number of intervals
 double INTERVAL_RATIO_CONSTANT = 15; //into how much intervals are the paths divided, based on maximum number of tunnel atoms in current run, example for shortest path with 1000 atoms, run will be divided into 100 intervalsw with value 10 
-double Z_start_radius = 2;
-double Z_end_radius = 2;
+double Z_start_radius = 1;
+double Z_end_radius = 1;
 double MIN_VALID_INTERTUNNEL_DISTANCE = 15;
 
 bool TESTING_ENABLED = true;
