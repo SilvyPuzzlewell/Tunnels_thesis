@@ -40,7 +40,10 @@ void print_vertex_coordinates(vertex* vert);
 shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> parent, double goal_distance, 
   double collision_check_step, int parent_index);
 void backtrack_process_path(shared_ptr<vertex> new_vertex );
+void step_interpolated(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest_neighbor_vertex, double max_step, 
+  double interpolation_step, int parent_index);
 
+double MAX_STEP_DISTANCE = 1;
 
 
 bool found = false;
@@ -129,11 +132,14 @@ int find_valid_frame(shared_ptr<vertex> cur, shared_ptr<vertex> child){
 //deletes other children pointers so the path has only the path child, 
 shared_ptr<vertex> copy_node_tree_to_path(shared_ptr<Path> path, shared_ptr<vertex> tree_node, shared_ptr<vertex> path_child_node, int cur_frame){
 
+
   shared_ptr<vertex> path_cur_node = tree_node->copy_without_structure_pointers();
   path_cur_node->set_frame_index(cur_frame);
   path_cur_node->add_child_pointer(path_child_node, false);
   path_child_node->set_parent_pointer(path_cur_node);
   path->add_node(path_cur_node);
+
+
 
   return path_cur_node;
 }
@@ -142,7 +148,9 @@ shared_ptr<vertex> copy_node_tree_to_path(shared_ptr<Path> path, shared_ptr<vert
 shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){ 
   shared_ptr<Path> path = make_shared<Path>(-1, endpoint->get_index(), get_current_frame());
 
+
   shared_ptr<vertex> cur = load_parent_vertex_from_tree(endpoint);
+  cout << "Tree: backtrack: parent index " << endpoint->get_parent_index() << endl;
 
   if(cur->get_last_valid_frame() != endpoint->get_last_valid_frame()) {cerr << "error in backtrack, endpoint and it's parents last frames doesn't match! " << endl; exit(0);} //these are more for testing, shoudn't happen
   if(endpoint->get_last_valid_frame() != get_current_frame()) {cerr << "error in backtrack, endpoint isn't in current frame! " << endl; exit(0);}
@@ -157,6 +165,7 @@ shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){
 
   while(cur->get_parent_index() != -1){ //cur is previous node from the tree
     cur = load_parent_vertex_from_tree(cur);
+    cout << "backtrack: parent index " << cur->get_parent_index() << endl;
 
     int nearest_frame = find_valid_frame(cur, child_pointer);
     
@@ -246,7 +255,60 @@ bool is_in_obstacle(double* loc_coord, double radius, int check_with_blocking_sp
      return (has_collided_with_protein_structure || has_collided_with_blocking_spheres);
     break;
   }
-} 
+}
+
+//lazy hack
+bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_blocking_spheres){
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
+  static int col_counter = 0;
+  ozcollide::Sphere sphere;
+  sphere.center.x = loc_coord[0];
+  sphere.center.y = loc_coord[1];
+  sphere.center.z = loc_coord[2];
+  sphere.radius = radius;
+
+  bool returned;
+
+  high_resolution_clock::time_point t2;
+
+  switch ( check_with_blocking_spheres ) {
+    case CHECK_ONLY_BLOCKING_SPHERES:
+    if(num_blocking_spheres() >= 1){
+      AABBTreeSphere* blocking_spheres_tree = get_blocking_spheres_tree();
+
+      t2 = high_resolution_clock::now();
+      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
+
+      return blocking_spheres_tree->isCollideWithSphere(sphere);   
+    } else {
+
+      t2 = high_resolution_clock::now();
+      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
+
+      return false;}
+    break;
+    case DONT_CHECK_WITH_BLOCKING_SPHERES:
+      returned = protein_tree->isCollideWithSphere(sphere);
+      t2 = high_resolution_clock::now();
+      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
+      return returned;
+    break;
+    case CHECK_WITH_BLOCKING_SPHERES:
+     bool has_collided_with_protein_structure = protein_tree->isCollideWithSphere(sphere);
+     bool has_collided_with_blocking_spheres;
+     if(num_blocking_spheres() >= 1){
+        AABBTreeSphere* blocking_spheres_tree = get_blocking_spheres_tree();
+        has_collided_with_blocking_spheres = blocking_spheres_tree->isCollideWithSphere(sphere);   
+      } else {has_collided_with_blocking_spheres = false;}
+
+     t2 = high_resolution_clock::now();
+     collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
+
+     return (has_collided_with_protein_structure || has_collided_with_blocking_spheres);
+    break;
+  }
+}  
   
 
 //function for generating next sample
@@ -263,7 +325,7 @@ double* sample(int iterations_counter){
       double r = ((double) rand() / (RAND_MAX));
       counter++;
       //cout << "test " << counter << " r "<< r << " colliding " << is_in_obstacle(loc_coord, test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES) << " bias " << inside_sampling_bias << endl;
-      if(r > inside_sampling_bias || is_in_obstacle(loc_coord, test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) break;
+      if((r > inside_sampling_bias && counter == 1) || is_in_obstacle(loc_coord, test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) break;
     }
  return loc_coord;
 }
@@ -299,18 +361,42 @@ bool termination_check(double* coordinates){
 }
 
 
+bool add_node(shared_ptr<vertex> nearest_neighbor, shared_ptr<vertex> new_vertex){
+    new_vertex->set_index(tree_index);
+    cout << "add_node: parent index: " << nearest_neighbor->get_index() << endl;
+    cout << "add node: cur_index: " << new_vertex->get_index() << endl;
+    new_vertex->set_parent_pointer(nearest_neighbor);
+    nearest_neighbor->add_child_pointer(new_vertex, false); //adds index of
+    
+    local_priority_kdTree_coordinates->add_node(new_vertex);
+    add_to_tree(new_vertex->get_location_coordinates(), tree_index, local_priority_kdTree);
+
+    cout << "add node: kDtree size " << local_priority_kdTree->size << endl;
+    cout << "add node: tree size " << local_priority_kdTree_coordinates->get_size() << endl;     
+    tree_index++;
+    if(termination_check(new_vertex->get_location_coordinates())){
+      backtrack_process_path(new_vertex);
+      return false;       
+    }
+    return true;
+}
+
 //kDtree_passed - kDtree in which the nearest point is looked for, global ??
 void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_coords, Tree* parent_tree, bool global, bool output){
   if(output){
     cout << "global " << global << " frame " << get_current_frame() << endl;
     cout << "it's size " << kDtree_passed->size << endl;
   }
-  
+
+  static int counter = 0;
+  cout << "counter " << counter << endl;
+  cout << "kd tree size " << kDtree_passed->size << endl;
+  cout << "tree size " << parent_tree->get_size() << endl;
   int parent_index = find_nearest_vertex(sampled_coords, kDtree_passed);
   shared_ptr<vertex> parent = parent_tree->get_node_pointer(parent_index); //indices mapping is kept 1:1
   shared_ptr<vertex> new_vertex = make_shared<vertex>(sampled_coords, parent,tree_index, probe_radius, get_current_frame(), true);
   //todo - redo so it adds stuff to the trees in the step function, interpolation can lead to different scenarios with one or more new nodes
-  new_vertex = step(new_vertex, parent, min_step, 1, parent_index);
+  step_interpolated(new_vertex, parent, MAX_STEP_DISTANCE, min_step, parent_index);
        //function for adding next point to graph points and sending signals to end iterating, use whichever you want                                                                                     //new_vertex is expected to be deleted if step_success_flag is set false, new vertex is added to                                                                                                     //both local and global coordinate representation, and only to local kd tree, the local kd tree is kept because o                                                                                      //the need to track local kd tree when deleting parts of it  
   if(step_success_flag){
     if(get_current_frame() > 1){
@@ -322,14 +408,9 @@ void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_co
         }
       }        
     } 
-    parent->add_child_pointer(new_vertex, false); //adds index of
-    local_priority_kdTree_coordinates->add_node(new_vertex);
-    add_to_tree(new_vertex->get_location_coordinates(), tree_index, local_priority_kdTree);   
-    tree_index++;
-    if(termination_check(new_vertex->get_location_coordinates())){
-      backtrack_process_path(new_vertex);       
-    }
   }
+
+  counter++;
 }
 
 //function for adding points to rr tree until break condition is achieved or program runs out of specified max number of iterations 
@@ -721,7 +802,7 @@ void center_tunnel(shared_ptr<Path> path){
   int index = -1;
  
   std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
-
+  cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
   for(iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
     //start node is not centered
     if(counter == 0){counter++;index = path_vertices[0]->get_child_index(); continue;}
@@ -757,6 +838,7 @@ void center_tunnel(shared_ptr<Path> path){
 
 
     shared_ptr<vertex> prev_node = path_vertices[cur_node->get_parent_index()];
+    cout << "center tunnel: counter " << counter << " cur_node " << cur_node->get_index() << endl;
     shared_ptr<vertex> child_node = path_vertices[path->get_child_index(cur_node->get_index())];
 
     double* direction_vector = add_vectors(cur_node->get_location_coordinates(), prev_node->get_location_coordinates(), SUBTRACTION);
@@ -944,6 +1026,7 @@ void label_used_nodes(shared_ptr<Path> path, int path_index){
   }
 }
 
+
 shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest_neighbor_vertex, double goal_distance, 
   double collision_check_step, int parent_index){
  // print_vertex_coordinates(destination);
@@ -988,6 +1071,131 @@ shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neares
   
   step_success_flag = true;
   return new_vertex;
+}
+
+array<double, 3> move_in_direction(double distance, double alfa, double beta, int kx, int ky, int kz, array<double, 3> old_coordinates){
+  double new_x = old_coordinates[0] - kx * cos(alfa) * cos(beta) * distance;
+  double new_y = old_coordinates[1] - ky * cos(alfa) * sin(beta) * distance;
+  double new_z = old_coordinates[2] - kz * sin(alfa) * distance;
+  array<double,3> ret{new_x, new_y, new_z};
+  return ret;
+}
+
+void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest_neighbor_vertex, double step, double alfa, double beta, int kx, int ky, int kz){
+  std::vector<shared_ptr<vertex>> interpolated_nodes;
+  int first_valid = 0;
+  int counter = 0;
+  bool is_new_first_valid = true;
+  double distance = compute_metric_eucleidean(new_vertex->get_location_coordinates(),nearest_neighbor_vertex->get_location_coordinates(), 3);
+  array<double, 3> new_coordinates{new_vertex->get_location_coordinates()[0], new_vertex->get_location_coordinates()[1], new_vertex->get_location_coordinates()[2]};
+  cout << "interpolation: distance: before" << distance << endl;
+  while(distance > step){
+    
+
+    //finds new coordinates and adds them with the referential vertex    
+    new_coordinates = move_in_direction(step, alfa, beta, kx, ky, kz, new_coordinates);
+
+    cout << "interpolation: distance " << distance << endl;
+    cout << "colliding ? " << is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES) << endl;
+
+    if(!(is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES))){
+      interpolated_nodes.push_back(make_shared<vertex>(copy_array_to_coordinate_pointer(new_coordinates), 0, probe_radius, get_current_frame(), true));
+      if(is_new_first_valid){
+        first_valid = interpolated_nodes.size() - 1;
+        is_new_first_valid = false;
+      }  
+    } else {
+      is_new_first_valid = true;
+    }
+    counter++;
+    distance = compute_metric_eucleidean(new_coordinates, copy_coordinate_pointer_to_array(nearest_neighbor_vertex->get_location_coordinates()));
+    if(TESTING_ENABLED){
+      //this means that it already should have gone beyond the original point, yet the loop still runs
+      if(counter > (MAX_STEP_DISTANCE / step)){
+        cout << "TEST ERROR: move_in_direction: interpolation is not working!" << endl;
+        exit(0);
+      }
+    }
+  }
+
+  //this means that node closest to parent one is colliding, therefore they are all discarded
+  if(is_new_first_valid){
+    step_success_flag = false;
+    return;
+  }
+
+  for(int i = interpolated_nodes.size() - 1; i >= first_valid; i--){
+
+    cout << "first valid " << first_valid << endl;
+    cout << "number of nodes " << interpolated_nodes.size() << endl;
+
+    if(i == (interpolated_nodes.size() - 1)){
+      if(TESTING_ENABLED){
+        //rounding error checked
+        if(compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) > (step + 0.001)){
+          cout << "TEST ERROR, interpolation: main parent node is in larger distance than step distance!" << endl;
+          cout << "distance " << compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) << endl;
+          cout << "step " << step << endl;
+          exit(0);
+        }
+      }
+      //path is backtracked, trees are reconstructed -> process must stop and begin in new space.
+      if(!add_node(nearest_neighbor_vertex,interpolated_nodes[i])){
+        break;
+      }
+    } else {
+      if(TESTING_ENABLED){
+        if(!double_equals(compute_metric_eucleidean(interpolated_nodes[i + 1]->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()), step)){
+          cout << "TEST ERROR, interpolation: parent node is in not in step distance!" << endl;
+          cout << "distance " << compute_metric_eucleidean(interpolated_nodes[i + 1]->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) << endl;
+          cout << "step " << step << endl;
+          exit(0);
+        }
+      }
+      if(!add_node(interpolated_nodes[i + 1],interpolated_nodes[i])){
+        break;
+      }
+    }
+  }
+  step_success_flag = true;
+}
+//new version
+//parameters - interpolation_step, max_step
+void step_interpolated(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest_neighbor_vertex, double max_step, 
+  double interpolation_step, int parent_index){
+ // print_vertex_coordinates(destination);
+  static int counter = 0;
+  
+  //compute differential coordinates
+  double x_differential = new_vertex->get_location_coordinates()[0] - nearest_neighbor_vertex->get_location_coordinates()[0]; double kx = signum(x_differential); //program is using differential coordinates instead of absolute ones
+  double y_differential = new_vertex->get_location_coordinates()[1] - nearest_neighbor_vertex->get_location_coordinates()[1]; double ky = signum(y_differential); 
+  double z_differential = new_vertex->get_location_coordinates()[2] - nearest_neighbor_vertex->get_location_coordinates()[2]; double kz = signum(z_differential); 
+    
+
+
+  double l = compute_metric_eucleidean(new_vertex->get_location_coordinates(),nearest_neighbor_vertex->get_location_coordinates(), 3);        //distance of generated point(source) from nearest atom(destination)
+  double l_planar = compute_metric_eucleidean(new_vertex->get_location_coordinates(),nearest_neighbor_vertex->get_location_coordinates(), 2); //distance of generated point from nearest atom in xy projection
+  double l_from_source_to_goal = l - max_step;                                                               //distance by which the generated point is moved towards the nearest atom
+  double alfa = atan(abs(z_differential) / l_planar);                                                             //angle of vertical and horizontal part of source to destiation trajectory
+  double beta; x_differential != 0 ? beta = atan(abs(y_differential) / abs(x_differential)) : beta = 0;           //angle of planar parts 
+
+  double new_x; double new_y; double new_z;
+
+
+  //basic version without any interpolation
+
+  //if the distance is larger than the max step length, the node is moved to the max step 
+  cout << "step_interpolated: original distance " << l << endl;
+  if(l > max_step){
+   //geometric computation of new coordiantes which satisfy the maximal distance of generated point to nearest atom in rr tree
+   new_x = x_differential - kx * cos(alfa) * cos(beta) * l_from_source_to_goal;
+   new_y = y_differential - ky * cos(alfa) * sin(beta) * l_from_source_to_goal;
+   new_z = z_differential - kz * sin(alfa) * l_from_source_to_goal;
+   new_vertex->get_location_coordinates()[0] = new_x + nearest_neighbor_vertex->get_location_coordinates()[0]; new_vertex->get_location_coordinates()[1] = new_y + nearest_neighbor_vertex->get_location_coordinates()[1]; new_vertex->get_location_coordinates()[2] = new_z + nearest_neighbor_vertex->get_location_coordinates()[2];
+  }
+  if(l > interpolation_step){
+    interpolate_segment(new_vertex, nearest_neighbor_vertex, min_step, alfa, beta, kx, ky, kz);
+  }
 }
   //all shit is put into local kdtree first, and on frame change the global tree is reconstructed from rrt
   /*

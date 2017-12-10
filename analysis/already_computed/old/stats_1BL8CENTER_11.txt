@@ -1,6 +1,0 @@
-tunnel_num 1 is found in 0.653846153846 percent iterations
-tunnel_num 2 is found in 0.846153846154 percent iterations
-tunnel_num 3 is found in 0.769230769231 percent iterations
-tunnel_num 4 is found in 0.884615384615 percent iterations
-tunnel_num 5 is found in 0.269230769231 percent iterations
-overall success of rrt algoritm in finding tunnels found by caver: 0.684615384615

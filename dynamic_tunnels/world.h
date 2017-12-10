@@ -59,6 +59,7 @@ class vertex {
   bool is_valid_in_frame(int frame);
 
   int get_index();
+  void set_index(int index);
 
   void add_child_pointer(shared_ptr<vertex> child, bool print_output);
   bool is_child_local(int index);

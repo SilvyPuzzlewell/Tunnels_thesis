@@ -73,6 +73,15 @@ double compute_metric_eucleidean(double* coord1, double* coord2){
   return sqrt(distance_squared);
 }
 
+double compute_metric_eucleidean(array<double, 3> coord1, array<double, 3> coord2){
+  double distance_squared = 0;
+  for(int i = 0; i < 3; i++){
+    distance_squared += pow(coord1[i]  - coord2[i], 2);
+  }
+  return sqrt(distance_squared);
+}
+
+
 void print_vector(double* vector){
   std::cout << " printing vector "<< vector[0] << " " << vector[1] << " " << vector[2] <<std::endl;
 }
@@ -104,4 +113,22 @@ bool contains_key(int index, std::map<int, shared_ptr<vertex>>& map){
   std::map<int, shared_ptr<vertex>>::iterator it;
   it = map.find(index);
   return it != map.end();
+}
+
+//stupid hack, I discovered the array thing later and i'm lazy ya know, I don't want to redo whole code now
+array<double, 3> copy_coordinate_pointer_to_array(double* pointer){
+  return array<double, 3>{pointer[0], pointer[1], pointer[2]};  
+}
+
+//as before, AND DON'T FORGET THE MEMORY MANAGEMENT
+double* copy_array_to_coordinate_pointer(array<double, 3> array){
+  double* coordinates = new double[3]; 
+  coordinates[0] = array[0]; coordinates[1] = array[1]; coordinates[2] = array[2];
+  return coordinates;
+}
+
+bool double_equals(double a, double b)
+{
+    double epsilon = 0.00001;
+    return std::abs(a - b) < epsilon;
 }

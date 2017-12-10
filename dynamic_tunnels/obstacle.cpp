@@ -110,6 +110,10 @@ int vertex::get_index(){
 	return index;
 }
 
+void vertex::set_index(int index){
+	this->index = index;
+}
+
 void vertex::add_child_pointer(shared_ptr<vertex> child, bool print_output){
 	if(child == NULL){
 		cerr << "vertex::add_child_pointer - adding null pointer!" << endl;
@@ -292,6 +296,7 @@ void Tree::add_node(shared_ptr<vertex> node){
 }
 
 void Tree::delete_node(int index){
+	std::cout << "Tree: deleted node " << index << endl; 
 	path_vertices.erase(index);
 }
 
