@@ -17,12 +17,13 @@
 #include <memory>
 
 #include "world.h"
-#include "./rapid/RAPID.H"
 #include "obstacle.h"
 #include "MPNN/include/DNN/multiann.h"
 #include "MPNN/include/DNN/ANN.h"
 #include "support_methods.h"
 #include "path_duplication_check.h"
+#include "tunnel_optimization.h"
+#include "rrt_methods.h"
 
 using namespace std::chrono;
 using namespace ozcollide;
@@ -48,10 +49,7 @@ double MAX_STEP_DISTANCE = 1;
 
 bool found = false;
 bool is_finished = false;
-std::vector <shared_ptr<Path>> paths;        //here are the fpund paths kept, all nodes in them are copied, therefore there isn't problem with deleting
-                                  //their nodes everywhere. However, that doesn't protect you, if you want to access the node in main structure!
-                                  //All nodes have related indices in main structure, however there is no guarantee that the ones in main structure
-                                  //weren't deleted!
+
 
 std::vector <int> duplicate_count; //keeps track of path count in "clusters"
 
@@ -60,8 +58,6 @@ vector <int> paths_count;
 vector <bool> path_found_in_frame;
 //-----
 
-Tree* local_priority_kdTree_coordinates; //exists only because dumbass MPNN doesn't support delete, kepts coordinates of local kd Tree
-Tree* global_tree_points;                //to:do
 double maximum_increase = 1.5; //aximum increase in blocking sphere size due to many duplicates, in percents (1.5 = 150 percent bigger sphere)
 bool step_success_flag;        //used to determine succesful add to local tree, if fails global is tryied or if global doesn't exist, iteration fail
 bool is_local_tree_initialized;
@@ -73,20 +69,12 @@ std::vector <shared_ptr<Path>> duplicated_paths;
 //vector <vertex*> visualise_centring;
 //---
 
-MPNN::MultiANN<double> *global_kdTree;
-MPNN::MultiANN<double> *local_priority_kdTree;
 
 //-----variables for finding program statistics
-auto nearest_neighbor_search_time = 0;
-auto tunnel_optimization_time = 0;
-auto centring_time = 0;
-auto collision_check_time = 0;
-auto duplication_check_time = 0;
 int nearest_vertex_search_count = 0;
 int num_of_duplicates = 0;
 //-----
 
-const int dimension = 3;                     //k-d tree dimension
 
 //------program parameters  //consider using txt file
 const double DUPLICATION_CHECK_CONSTANT = 0.6; //ratio of inter-tunnel distance to tunnel length, if lower, tunnel is considered a duplicate of existing tunnel
@@ -97,14 +85,7 @@ const int MAX_TUNNELS = 10000;                   //maximum number of tunnels bef
 //******
 //------
 
-//--- identificators of global/local kd_tree for easier reading
-const int NONE = 0;
-const int GLOBAL = 1; 
-const int LOCAL = 2;
-const int BOTH = 3;
-//---
 
-int tree_index = 0;
 
 
 //obvious
@@ -150,7 +131,7 @@ shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){
 
 
   shared_ptr<vertex> cur = load_parent_vertex_from_tree(endpoint);
-  cout << "Tree: backtrack: parent index " << endpoint->get_parent_index() << endl;
+  //cout << "Tree: backtrack: parent index " << endpoint->get_parent_index() << endl;
 
   if(cur->get_last_valid_frame() != endpoint->get_last_valid_frame()) {cerr << "error in backtrack, endpoint and it's parents last frames doesn't match! " << endl; exit(0);} //these are more for testing, shoudn't happen
   if(endpoint->get_last_valid_frame() != get_current_frame()) {cerr << "error in backtrack, endpoint isn't in current frame! " << endl; exit(0);}
@@ -165,7 +146,7 @@ shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){
 
   while(cur->get_parent_index() != -1){ //cur is previous node from the tree
     cur = load_parent_vertex_from_tree(cur);
-    cout << "backtrack: parent index " << cur->get_parent_index() << endl;
+    //cout << "backtrack: parent index " << cur->get_parent_index() << endl;
 
     int nearest_frame = find_valid_frame(cur, child_pointer);
     
@@ -201,114 +182,7 @@ void init_start(){
   is_local_tree_initialized = true;
 }
 
-//collision checking without checking the blocking spheres structure is used in functions not involving path search (path optimization and chcecking whether new node is inside the protein)
-const int CHECK_ONLY_BLOCKING_SPHERES = 2;
-const int CHECK_WITH_BLOCKING_SPHERES = 1;
-const int DONT_CHECK_WITH_BLOCKING_SPHERES = 0;
-bool is_in_obstacle(double* loc_coord, double radius, int check_with_blocking_spheres){
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-  static int col_counter = 0;
-  ozcollide::Sphere sphere;
-  sphere.center.x = loc_coord[0];
-  sphere.center.y = loc_coord[1];
-  sphere.center.z = loc_coord[2];
-  sphere.radius = radius;
-
-  bool returned;
-
-  high_resolution_clock::time_point t2;
-
-  switch ( check_with_blocking_spheres ) {
-    case CHECK_ONLY_BLOCKING_SPHERES:
-    if(num_blocking_spheres() >= 1){
-      AABBTreeSphere* blocking_spheres_tree = get_blocking_spheres_tree();
-
-      t2 = high_resolution_clock::now();
-      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-
-      return blocking_spheres_tree->isCollideWithSphere(sphere);   
-    } else {
-
-      t2 = high_resolution_clock::now();
-      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-
-      return false;}
-    break;
-    case DONT_CHECK_WITH_BLOCKING_SPHERES:
-      returned = protein_tree->isCollideWithSphere(sphere);
-      t2 = high_resolution_clock::now();
-      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-      return returned;
-    break;
-    case CHECK_WITH_BLOCKING_SPHERES:
-     bool has_collided_with_protein_structure = protein_tree->isCollideWithSphere(sphere);
-     bool has_collided_with_blocking_spheres;
-     if(num_blocking_spheres() >= 1){
-        AABBTreeSphere* blocking_spheres_tree = get_blocking_spheres_tree();
-        has_collided_with_blocking_spheres = blocking_spheres_tree->isCollideWithSphere(sphere);   
-      } else {has_collided_with_blocking_spheres = false;}
-
-     t2 = high_resolution_clock::now();
-     collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-
-     return (has_collided_with_protein_structure || has_collided_with_blocking_spheres);
-    break;
-  }
-}
-
-//lazy hack
-bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_blocking_spheres){
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
-
-  static int col_counter = 0;
-  ozcollide::Sphere sphere;
-  sphere.center.x = loc_coord[0];
-  sphere.center.y = loc_coord[1];
-  sphere.center.z = loc_coord[2];
-  sphere.radius = radius;
-
-  bool returned;
-
-  high_resolution_clock::time_point t2;
-
-  switch ( check_with_blocking_spheres ) {
-    case CHECK_ONLY_BLOCKING_SPHERES:
-    if(num_blocking_spheres() >= 1){
-      AABBTreeSphere* blocking_spheres_tree = get_blocking_spheres_tree();
-
-      t2 = high_resolution_clock::now();
-      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-
-      return blocking_spheres_tree->isCollideWithSphere(sphere);   
-    } else {
-
-      t2 = high_resolution_clock::now();
-      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-
-      return false;}
-    break;
-    case DONT_CHECK_WITH_BLOCKING_SPHERES:
-      returned = protein_tree->isCollideWithSphere(sphere);
-      t2 = high_resolution_clock::now();
-      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-      return returned;
-    break;
-    case CHECK_WITH_BLOCKING_SPHERES:
-     bool has_collided_with_protein_structure = protein_tree->isCollideWithSphere(sphere);
-     bool has_collided_with_blocking_spheres;
-     if(num_blocking_spheres() >= 1){
-        AABBTreeSphere* blocking_spheres_tree = get_blocking_spheres_tree();
-        has_collided_with_blocking_spheres = blocking_spheres_tree->isCollideWithSphere(sphere);   
-      } else {has_collided_with_blocking_spheres = false;}
-
-     t2 = high_resolution_clock::now();
-     collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-
-     return (has_collided_with_protein_structure || has_collided_with_blocking_spheres);
-    break;
-  }
-}  
   
 
 //function for generating next sample
@@ -363,16 +237,16 @@ bool termination_check(double* coordinates){
 
 bool add_node(shared_ptr<vertex> nearest_neighbor, shared_ptr<vertex> new_vertex){
     new_vertex->set_index(tree_index);
-    cout << "add_node: parent index: " << nearest_neighbor->get_index() << endl;
-    cout << "add node: cur_index: " << new_vertex->get_index() << endl;
+   // cout << "add_node: parent index: " << nearest_neighbor->get_index() << endl;
+    //cout << "add node: cur_index: " << new_vertex->get_index() << endl;
     new_vertex->set_parent_pointer(nearest_neighbor);
     nearest_neighbor->add_child_pointer(new_vertex, false); //adds index of
     
     local_priority_kdTree_coordinates->add_node(new_vertex);
     add_to_tree(new_vertex->get_location_coordinates(), tree_index, local_priority_kdTree);
 
-    cout << "add node: kDtree size " << local_priority_kdTree->size << endl;
-    cout << "add node: tree size " << local_priority_kdTree_coordinates->get_size() << endl;     
+   // cout << "add node: kDtree size " << local_priority_kdTree->size << endl;
+   // cout << "add node: tree size " << local_priority_kdTree_coordinates->get_size() << endl;     
     tree_index++;
     if(termination_check(new_vertex->get_location_coordinates())){
       backtrack_process_path(new_vertex);
@@ -389,9 +263,9 @@ void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_co
   }
 
   static int counter = 0;
-  cout << "counter " << counter << endl;
-  cout << "kd tree size " << kDtree_passed->size << endl;
-  cout << "tree size " << parent_tree->get_size() << endl;
+  //cout << "counter " << counter << endl;
+ // cout << "kd tree size " << kDtree_passed->size << endl;
+  //cout << "tree size " << parent_tree->get_size() << endl;
   int parent_index = find_nearest_vertex(sampled_coords, kDtree_passed);
   shared_ptr<vertex> parent = parent_tree->get_node_pointer(parent_index); //indices mapping is kept 1:1
   shared_ptr<vertex> new_vertex = make_shared<vertex>(sampled_coords, parent,tree_index, probe_radius, get_current_frame(), true);
@@ -434,492 +308,6 @@ void find_path(ofstream* stats_filename){
    }
 }  
 
-//function which returns approximation of maximal radius of sphere fitting into the tunnel, expects non-colliding sphere 
-double approximate_radius(double* coordinates, double default_radius, double precision, double default_approximation_step){
-  double approximation_step = default_approximation_step;
-  double cur_radius = default_radius + approximation_step;
-  while(approximation_step > precision && cur_radius < test_sphere_radius + 1){
-    bool hasCollided = is_in_obstacle(coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES);
-    if(!hasCollided){
-      cur_radius += approximation_step;
-    }
-    else{
-      cur_radius -= approximation_step;
-      approximation_step = approximation_step / 2;
-      cur_radius += approximation_step;
-    }
-  }
-  return cur_radius;
-}
-
-
-/*
-Function which returns node approximately centered around the tunnel path. It can be used in two modes, either it centers node without respect to neighboring nodes, which leads to jagged path
-but is more accurate or it takes into account two neighboring nodes and moving them in the same direction as the main node aimed for centering, which results in smoother path but more approximate
-centering. Function returns new node without deleting the original, so the user must delete the original one if that is desired. Neighboring nodes' coordinates are changed only.
-Function firslty finds plane perpendicular to supplied direction vector, using two perpendicular vectors to it and then performs "gradient descent" trying to move the node in the plane in attempt
-to find the maximum possible radius to fit inside the tunnel. 
-*/
-double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previous_node, shared_ptr<vertex> next_node, double* coordinate_vector, double increment, bool are_neighbors_centered, bool rewrite_node, bool return_node_info){
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
-
-
-  double normalised_length = 1;
-  //what must be deleted perpendicular vector, node_coordinates, cur_perpendicular_vector, cur_second_perpendicular_vector, shift_vector, shifted_coordinates
-  //first perpendicular vector, found by transposition of coordinates
-  double perpendicular_vector_2D1[3]  = {-coordinate_vector[1], coordinate_vector[0], 0};
-  double perpendicular_vector_2D2[3]  = {0, coordinate_vector[2], -coordinate_vector[1]};
-  double* perpendicular_vector = add_vectors(perpendicular_vector_2D1, perpendicular_vector_2D2, ADDITION);
-  
-  //second base perpendicular vector, found using cross product
-  double second_perpendicular_vector[3]  = {coordinate_vector[1]*perpendicular_vector[2] - coordinate_vector[2]*perpendicular_vector[1],
-  coordinate_vector[2]*perpendicular_vector[0] - coordinate_vector[0]*perpendicular_vector[2],
-  coordinate_vector[0]*perpendicular_vector[1] - coordinate_vector[1]*perpendicular_vector[0]};
-
-  //normalization of perpendicular (plane base) vectors to specified length
-  normalize_vector(perpendicular_vector, normalised_length);
-  normalize_vector(second_perpendicular_vector, normalised_length);
-  
-  //coordinates of centered node, it must be copied because the function is meant to keep the original node unchanged. Neighboring are declared and intialized to use later in case neighbor centering
-  //is allowed 
-  double* node_coordinates = centered_node->copy_coordinates();
-  double* prev_node_shifted_coordinates;
-  double* next_node_shifted_coordinates;
-  if(are_neighbors_centered){
-    prev_node_shifted_coordinates = previous_node->copy_coordinates();
-    if(next_node != NULL){
-      next_node_shifted_coordinates = next_node->copy_coordinates(); //happens for last node, that one should be centered, unlike the root node
-    }
-      
-  } 
-  
-  //maximum radius in default position, used in first iteration to find larger one 
-  double cur_radius = approximate_radius(node_coordinates, centered_node->get_radius(), 0.01, 0.1);
-  //for comparison
-  double check_radius = cur_radius; 
-  double default_radius = centered_node->get_radius(); //reference radius, important because radius adjusting function expects non-colliding molecule, if
-  //radius used to store previous maximum value to check the one found in current iteration against 
-  double prev_radius = default_radius;
-
-  /*  //sanity check
-  cout << "--dot products--" << endl;
-  cout << dot_product(coordinate_vector, perpendicular_vector) << endl;
-  cout << dot_product(coordinate_vector, second_perpendicular_vector) << endl;
-  cout << dot_product(second_perpendicular_vector, perpendicular_vector) << endl;
-  cout << "--dot products out--" << endl;
-  */
-
-  //gradient descent, in a plane bounded by two perpendicular plane vectors, because we don't want to find places outside the nodes postion in tunnel
-  //debug **
-  /*
-  static int counter = 0;      //**
-  counter++;                   //**
-  static int vis_counter = 0;  //** 
-  */
-
-  //parameters of algorithm, min_increment is the minimum shift of node at which the algortihm still runs and number_of_trials is amount of different translations
-  //the algorithm tries in one iteration
-  double min_increment = 0.125;
-  int number_of_trials = 10;
-
-  while((increment > min_increment) && cur_radius < test_sphere_radius){
-    //variable to store current best increase in maximum radius which will be found by next iteration of algorithm
-    double max_increase = 0;
-    //runs number_of_trials interations with translations of fixed length and variable directions in translation plane from current node position with attempt to find new position with largest radius
-    for(int i = 0; i < number_of_trials; i++){
-      //angle according to which the node will be shifted in this attempt
-      double angle = (i * 2 * M_PI) / (number_of_trials - 1);                  //deterministic descent
-      //double angle = ((double) rand() / (double) RAND_MAX) * 2 * M_PI;       //stochastic descent
-
-      //decomposition of generated angle into base vectors
-      double first_vector_part = increment * normalised_length * sin(angle);   
-      double second_vector_part = increment * normalised_length * cos(angle);
-      
-      //base vectors are copied, so the original ones wouldn't be lost by shifting by current angle and multiplied by base vector components of current tested direction
-      double* cur_perpendicular_vector = copy_vector(perpendicular_vector); double* cur_second_perpendicular_vector = copy_vector(second_perpendicular_vector);
-      multiply_vector(cur_perpendicular_vector, first_vector_part); multiply_vector(cur_second_perpendicular_vector, second_vector_part);
-      //finally the shifted vectors are added to point to location in circle with increment radius and summed with the node's coordinates
-      double* shift_vector = add_vectors(cur_perpendicular_vector, cur_second_perpendicular_vector, ADDITION);      
-      double* shifted_coordinates = add_vectors(shift_vector, node_coordinates, ADDITION);
-
-      //... and maximum radius of ball in that placement is found
-      cur_radius = approximate_radius(shifted_coordinates, default_radius, 0.01, 0.1);
-     
-      //maximum radius in this position is checked subtracted from maximum radius found in previous iteration and checked against the maximum increase found in current iteration, which starts at zero,
-      //therefore the new maximum radius must be greater than the previous one
-      if((cur_radius - prev_radius) > max_increase && !is_in_obstacle(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) {
-        
-
-        //--- can be buggy, check later
-        if(are_neighbors_centered){
-          //new coordinates shifted in the same way as main node, this is to prevent excessive deviation and resulting jaggedness of tunnel
-          double* neighbors_shift_vector = copy_vector(shift_vector); multiply_vector(neighbors_shift_vector, 0.5);
-         // cout << neighbors_shift_vector[0] << endl;
-         // cout << shift_vector[0] << endl;
-          double* cur_prev_node_shifted_coordinates = add_vectors(neighbors_shift_vector, prev_node_shifted_coordinates, ADDITION);
-          double* cur_next_node_shifted_coordinates = add_vectors(neighbors_shift_vector, next_node_shifted_coordinates, ADDITION);
-          delete [] neighbors_shift_vector;
-
-          if((next_node == NULL && !is_in_obstacle(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES))||(next_node != NULL && !is_in_obstacle(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES) && !is_in_obstacle(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES))){
-             //test was succesfull, node can be moved
-             //new radius is assigned
-             max_increase = cur_radius - prev_radius;
-             prev_radius = cur_radius;
-             delete [] node_coordinates;
-             node_coordinates = copy_vector(shifted_coordinates);
-             //if replacement is possible, the old translated nodes' coordinates are replaced with new one
-             delete [] prev_node_shifted_coordinates; delete [] next_node_shifted_coordinates; 
-             prev_node_shifted_coordinates = copy_vector(cur_prev_node_shifted_coordinates);
-             next_node_shifted_coordinates = copy_vector(cur_next_node_shifted_coordinates);
-             delete [] cur_prev_node_shifted_coordinates; delete [] cur_next_node_shifted_coordinates;
-          } 
-          else {
-             delete [] cur_prev_node_shifted_coordinates; delete [] cur_next_node_shifted_coordinates;
-          }
-        }
-        
-
-        //---can be buggy. check later---end
-        else {
-          max_increase = cur_radius - prev_radius;
-          prev_radius = cur_radius;
-          delete [] node_coordinates;
-          node_coordinates = copy_vector(shifted_coordinates); 
-       // cout << cur_radius << endl;
-        }
-  
-      }
-      delete [] cur_perpendicular_vector; delete [] cur_second_perpendicular_vector; delete [] shift_vector; delete [] shifted_coordinates;
-   }
-   //cout << endl;
-   increment = increment / 1.5;
-
-  }
-  /*
-  if(counter % 20 == 0){vis_counter++; cout << "centring field size " << visualise_centring.size()<<endl;} //**
-  */
-  double ret_radius;
-  cur_radius > check_radius ? ret_radius = cur_radius : ret_radius = check_radius;
-  delete [] perpendicular_vector;
-  if(rewrite_node){
-  centered_node->set_coordinates(node_coordinates);
-  centered_node->set_radius(cur_radius);
-  }
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  centring_time += duration_cast<microseconds>( t2 - t1 ).count();
-
-  if(are_neighbors_centered){
-    delete [] prev_node_shifted_coordinates;
-    if(next_node != NULL){
-      delete [] next_node_shifted_coordinates; //happens for last node, that one should be centered, unlike the root node
-    }    
-  } 
-
-
-  if(!return_node_info){ //this is because we don't always want to allocate new memory
-    delete [] node_coordinates;
-    return NULL;
-  } else {
-    double* ret = new double[4];
-    ret[0] = node_coordinates[0]; ret[1] = node_coordinates[1]; ret[2] = node_coordinates[2]; ret[3] = cur_radius;
-    delete [] node_coordinates; 
-    return ret;   
-  }
-  //std::cout<< cur_radius << endl;
-}
-
-
-void smoothing(shared_ptr<Path> path){
-  int i = 0;
-  int next_atom_index = 2;
-  int beginning_index = path->get_beginning_index(); 
-  //cout << path.size() << endl;
-
-  std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
-  shared_ptr<vertex> cur = path_vertices[beginning_index];
-  if(path_vertices.size() < 3){
-    return;
-  }
-
-  
-
-  int cur_index = cur->get_index();
-  int child_index = path->get_child_index(cur_index);
-  int second_child_index = path->get_child_index(child_index);
-  while(path->get_children_count(second_child_index) > 0){
-    cur_index = cur->get_index();
-    child_index = path->get_child_index(cur_index);
-    second_child_index = path->get_child_index(child_index);    //if crap like this is needed more in the future, consider modifying path structure to index nodes within path for random access inside
-
-
-    double* direction_vector = add_vectors(path_vertices[second_child_index]->get_location_coordinates(), path_vertices[cur_index]->get_location_coordinates(), SUBTRACTION);
-    multiply_vector(direction_vector, 0.5);
-    double* shifted_coordinates_vector = add_vectors(direction_vector, path_vertices[cur_index]->get_location_coordinates(), ADDITION);
-    bool is_not_passable = is_in_obstacle(shifted_coordinates_vector, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES);
-    if(!is_not_passable){
-      path->erase_node_with_reconnecting(child_index);
-    } 
-
-    cur = path_vertices[second_child_index];
-    //path->print_nodes();
-    cur_index = cur->get_index();
-    //cout << "cur_index " << cur_index;
-    child_index = path->get_child_index(cur_index);
-    //cout << "child_index " << child_index;
-    if(path_vertices[child_index]->get_children_count() == 0){ //can happen because of deleting passable elements
-      delete [] shifted_coordinates_vector;
-      delete [] direction_vector;
-      break;
-    }
-    second_child_index = path->get_child_index(child_index);
-    //cout << "scond child_index " << second_child_index;
-
-    delete [] shifted_coordinates_vector;
-    delete [] direction_vector;
-  }
-}
-
-//Later I should research how to use generics here instead of two functions
-void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only_valid_in_curframe){
-  cout << "rebuild status " << status <<endl;
-  if(is_initialized){
-    if(status == GLOBAL || status == BOTH) {delete global_kdTree;}
-    if(status == LOCAL || status == BOTH) {delete local_priority_kdTree;}
-  }
-  if(status == GLOBAL || status == BOTH)build_tree(GLOBAL);
-  if(status == LOCAL || status == BOTH)build_tree(LOCAL);
-  
-  if(copy_stuff && (status == GLOBAL || status == BOTH)){
-    std::map<int, shared_ptr<vertex>> graph_points = global_tree_points->get_vertices();
-    cout << "rebuild glob " << graph_points.size() << endl;
-    for (std::map<int, shared_ptr<vertex>>::iterator iterator = graph_points.begin(); iterator != graph_points.end(); iterator++){
-      add_to_tree(iterator->second->get_location_coordinates(), iterator->second->get_index(), global_kdTree);
-    }
-  }
-  if(copy_stuff && (status == LOCAL || status == BOTH)){
-
-    std::map<int, shared_ptr<vertex>> graph_points_loc = local_priority_kdTree_coordinates->get_vertices();
-    cout << "rebuild loc " << graph_points_loc.size() << endl;
-    for (std::map<int, shared_ptr<vertex>>::iterator iterator = graph_points_loc.begin(); iterator != graph_points_loc.end(); iterator++){
-      if(!only_valid_in_curframe){
-        add_to_tree(iterator->second->get_location_coordinates(), iterator->second->get_index(), local_priority_kdTree);
-      }
-      else{
-        if(iterator->second->get_last_valid_frame() == get_current_frame()){
-          add_to_tree(iterator->second->get_location_coordinates(), iterator->second->get_index(), local_priority_kdTree);
-        }
-      } 
-    }
-    cout << "comparison: kd tree " << local_priority_kdTree->size << " data struct " << graph_points_loc.size() << endl;  
-  }
-}
-
-
-
-
-//recursive function deleting all children of particular node, remember paths nodes are copied and have their respective children at ending position of chidren_vertices(.. i should
-//delete the previous.. to_do .. ), but indices are matching with the main graph_parts structure.. deleting paths and subtrees should be thought of as separate functions. Prev index is imporatant
-//for recuresive part of the run for deleting child references in parent nodes, therefore we don't care about it in original call
-void cut_subtree_in_main_tree_recursion(shared_ptr<vertex> cur, bool has_debugging_output, bool is_local){
-  //cout << "recuresion, children count " <<cur->get_children_count() << endl;
-  while(cur->get_children_count() != 0){
-    /*
-    if(has_debugging_output){
-      cout << "--printing path--" << endl;
-      for(std::map<int, shared_ptr<vertex>>::iterator iterator = graph_points.begin(); iterator != graph_points.end(); iterator++){
-        cout << iterator->second->get_index() << " "; 
-      }
-      cout << endl <<"--printing path--end--" << endl;
-      cout << "index "<< cur->children_indices[cur->children_indices.size() -1] << endl;
-      cout << "bef "<< cur->children_indices.size() << endl; 
-    }
-    */
-    shared_ptr<vertex> next = cur->get_child_pointer(cur->get_children_count() -1);
-    cut_subtree_in_main_tree_recursion(next, has_debugging_output, next->is_local());
-    if(has_debugging_output){
-      cout << "aft "<< cur->get_children_count() << endl; 
-    }
-    cur->delete_child(cur->get_children_count() -1); //last one remaining
-  }
-  if(has_debugging_output){cout << "deleting " <<cur->get_index()<<endl;}
-  cur->is_local() ?  local_priority_kdTree_coordinates->delete_node(cur->get_index()) : global_tree_points->delete_node(cur->get_index());
-
-}
-
-//deletes subtree beginning at index and deletes reference to subtree root from it's parent node 
-void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debugging_output){
-
-  shared_ptr<vertex> node_in_tree;
-  shared_ptr<vertex> parent_node_in_tree;
-
-  //cout << "cut: nodes: " << endl;
- // local_priority_kdTree_coordinates->print_nodes();
-  if(get_current_frame() > 1){
-  //  global_tree_points->print_nodes();
-  }
-  //cout << "is first local? " << first_delet_node->is_local() << endl;
-  first_delet_node->is_local() ? node_in_tree = local_priority_kdTree_coordinates->get_node_pointer(first_delet_node->get_index()) : node_in_tree = global_tree_points->get_node_pointer(first_delet_node->get_index());
-  parent_node_in_tree = node_in_tree->get_parent_pointer();
-  bool found = false;
-  //cout << "path_index " << first_delet_node->get_index() << " path parent index "<< parent_path->get_index()<<" tree_index " << node_in_tree->get_index() << endl;
-  for(int i = 0; i < parent_node_in_tree->get_children_count(); i++){
-    if(parent_node_in_tree->get_child_index(i) == node_in_tree->get_index()){
-      parent_node_in_tree->delete_child(i);
-      found = true;
-      break;
-    }
-  }
-  if(found == false){
-    cout << "size of local tree " << local_priority_kdTree_coordinates->get_size() << endl;
-    cout << "size of global tree " << global_tree_points->get_size() << endl;
-    cout << "path node index " << first_delet_node->get_index() << endl;
-    cout << "parent tree node children count " << endl;
-    cerr << "fatal error - in cutting subtree, root of subtree doesn't have parent" << endl;
-    exit(0);
-  }
-
-  int global_tree_size;
-  global_tree_points != NULL ? global_tree_size = global_tree_points->get_size() : 0;
-  int local_tree_size = local_priority_kdTree_coordinates->get_size();
-  int kdTree_rebuild_index = 0; //four value logic, need to find which tree(s) to rebuild, 0 - none, 1 - global, 2 - local, 3 - both
-  int prev = local_priority_kdTree_coordinates->get_size();
-  cut_subtree_in_main_tree_recursion(node_in_tree, has_debugging_output, first_delet_node->is_local());
-
-  if(global_tree_points != NULL){
-    if(global_tree_points->get_size() != global_tree_size)kdTree_rebuild_index++; 
-  }
-  if(local_priority_kdTree_coordinates->get_size() != local_tree_size)kdTree_rebuild_index += 2;
-  rebuild_kd_tree(true, kdTree_rebuild_index, true, true);
-  cout << "tree rebuilt" << endl;
-}
-
-
-int copies_count = 0;
-void center_tunnel(shared_ptr<Path> path){
-  std::map<int, shared_ptr<vertex>>::iterator iterator;
-
-  int counter = 0;
-  int index = -1;
- 
-  std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
-  cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
-  for(iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
-    //start node is not centered
-    if(counter == 0){counter++;index = path_vertices[0]->get_child_index(); continue;}
-    
-    /*
-    With reused tree, that already centered node is inside some previous trajectory. Therefore instead of costy centering procedure it can just be copied from that path.
-    exists_in_path() method returns -1 if the node is new. else it returns index into path in paths vector.
-    Important - node must be valide in the same frame as current node, because molecular positions are different in every frame!
-    Duplicated paths are deleted, therefore we must be sure to not index into them, this is achieved by calling the "labeling" function, which points the nodes in main data structures
-    into valid paths, when the path is added into main paths vector 
-    */
-    shared_ptr<vertex> cur_node = path_vertices[index];
-    bool is_local = cur_node->is_local();
-
-    int exists_in_path = -1;
-    if(is_local){
-      exists_in_path = local_priority_kdTree_coordinates->get_node_pointer(cur_node->get_index())->is_in_path();
-    } else {
-      exists_in_path = global_tree_points->get_node_pointer(cur_node->get_index())->is_in_path();
-    }
-
-    if(exists_in_path != -1){
-      shared_ptr<vertex> related_node = paths[exists_in_path]->get_node_pointer(cur_node->get_index());
-      cur_node->set_coordinates(related_node->get_location_coordinates()); //copy identical nodes coordinates to current;
-      cur_node->set_radius(related_node->get_radius());
-      copies_count++;
-
-      if(cur_node->get_children_count() > 0){
-        index = cur_node->get_child_index();
-      }
-      continue;
-    }
-
-
-    shared_ptr<vertex> prev_node = path_vertices[cur_node->get_parent_index()];
-    cout << "center tunnel: counter " << counter << " cur_node " << cur_node->get_index() << endl;
-    shared_ptr<vertex> child_node = path_vertices[path->get_child_index(cur_node->get_index())];
-
-    double* direction_vector = add_vectors(cur_node->get_location_coordinates(), prev_node->get_location_coordinates(), SUBTRACTION);
-    
-    center_node(cur_node, prev_node, child_node, direction_vector, 1, true, true, false);
-  
-    delete [] direction_vector;
-    
-    /* deleting subtrees is important because of path blocking. Blocking sphere needs to be placed in the center of the tunnel at it's endpoint
-    and the tree after this endpoint would create would create valid growth into the empty region, which obviously sucks. It's
-    caused by the fact that the part of the tunnel growing after original endpoint ends after centering in empty space.
-    both local and global coordinates of the tree after endpoint needs to be declared invalid now and deleted from kd trees,
-    and the kd trees are rebuilded. In first frame, it's possible to only care about local structures, which speeds up static detection.
-    */
-
-
-
-    if(path_vertices[index]->get_radius() > test_sphere_radius){
-      int child_index = path->get_child_index(index);    
-      if(child_index == -1){
-          cerr << "your start position already lies in empty space!" << endl;
-          exit(0);      
-      }
-      cut_subtree_in_main_tree(path->get_node_pointer(child_index), false); 
-      path->erase_from_index(child_index); 
-      break;}; //to_do
-    if(cur_node->get_children_count() > 0){
-      index = cur_node->get_child_index(0);
-    }
-    counter++;
-  }
-  
-  path->set_endpoint_index(index); 
-}
-
-
-
-
-void cut_tunnel(shared_ptr<Path> path){
-  std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
-  std::vector<int> vertex_indices_to_be_deleted;
-
-  int endpoint_index = path->get_endpoint_index();
-  int endpoint_parent_index = path->get_parent_index(endpoint_index);
-  //print_map_indices(path->get_vertices(), "cut tunnel");
-  while((endpoint_index != -1 && endpoint_parent_index != -1) && path->get_node_pointer(endpoint_index)->is_in_path() == -1){   //check also with global
-    //---
-    /*
-    path->print_nodes();
-    cout << endl << "ep " << endpoint_index;
-    cout << endl << "epp " << endpoint_parent_index << endl; 
-    //---
-    */
-    //cout << "cut tunnel indices " << endpoint_index << " " << endpoint_parent_index << endl;
-    //cout << "cut tunnel " << path_vertices[endpoint_index]->index << " " << path_vertices[endpoint_parent_index]->index << " " << local_priority_kdTree_coordinates[endpoint_index]->is_in_path()<< endl;
-    double* direction_vector = add_vectors(path_vertices[endpoint_index]->get_location_coordinates(), path_vertices[endpoint_parent_index]->get_location_coordinates(), SUBTRACTION);
-    double* node_information = center_node(path_vertices[endpoint_index], NULL, NULL, direction_vector, test_sphere_radius / 1.5, false, false, true);
-    if(node_information [3] > test_sphere_radius){      
-      vertex_indices_to_be_deleted.push_back(endpoint_index);
-    } 
-
-    delete [] direction_vector;
-    delete [] node_information;
-
-    endpoint_index = path->get_parent_index(endpoint_index);
-    endpoint_parent_index = path->get_parent_index(endpoint_index);
-
-  }
-
-  int deleted_index = path->get_child_index(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
-  shared_ptr<vertex> cur = path->get_node_pointer(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
-
-  int prev = path->get_size();
-  cut_subtree_in_main_tree(path->get_node_pointer(deleted_index),false); //from element before the last
-  path->erase_from_index(deleted_index);
-  //cout << "path post " << prev - path->get_size() << endl;
-  //exit(0);
-  
-}
-
-//function checking whether tested path duplicates part of reference path, complete duplication check must be two way
 
 bool path_check(std::map<int, shared_ptr<vertex>>& tested_path, std::map<int, shared_ptr<vertex>>& reference_path){
   double distances_sum = 0;
@@ -981,23 +369,6 @@ int is_duplicated(shared_ptr<Path> tested__path){
   return -1;
 } 
 
-//returns index of last element in cut path.
-int path_optimization(shared_ptr<Path> path){
-  //path = smoothing(path);
-  high_resolution_clock::time_point t1 = high_resolution_clock::now();
- 
-  smoothing(path);
-  center_tunnel(path);
-  cut_tunnel(path);
-  
-
-  high_resolution_clock::time_point t2 = high_resolution_clock::now();
-  tunnel_optimization_time += duration_cast<microseconds>( t2 - t1 ).count();
-  
-  return 1;
-  //cut_tunnel(path);
-  //path = center_tunnel(path);
-}
 
 void add_blocking_sphere(double* coordinates, double radius){
   static int blocking_spheres_counter = 0;
@@ -1088,15 +459,15 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
   bool is_new_first_valid = true;
   double distance = compute_metric_eucleidean(new_vertex->get_location_coordinates(),nearest_neighbor_vertex->get_location_coordinates(), 3);
   array<double, 3> new_coordinates{new_vertex->get_location_coordinates()[0], new_vertex->get_location_coordinates()[1], new_vertex->get_location_coordinates()[2]};
-  cout << "interpolation: distance: before" << distance << endl;
+  //cout << "interpolation: distance: before" << distance << endl;
   while(distance > step){
     
 
     //finds new coordinates and adds them with the referential vertex    
     new_coordinates = move_in_direction(step, alfa, beta, kx, ky, kz, new_coordinates);
 
-    cout << "interpolation: distance " << distance << endl;
-    cout << "colliding ? " << is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES) << endl;
+    //cout << "interpolation: distance " << distance << endl;
+    //cout << "colliding ? " << is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES) << endl;
 
     if(!(is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES))){
       interpolated_nodes.push_back(make_shared<vertex>(copy_array_to_coordinate_pointer(new_coordinates), 0, probe_radius, get_current_frame(), true));
@@ -1126,8 +497,8 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
 
   for(int i = interpolated_nodes.size() - 1; i >= first_valid; i--){
 
-    cout << "first valid " << first_valid << endl;
-    cout << "number of nodes " << interpolated_nodes.size() << endl;
+    ////cout << "first valid " << first_valid << endl;
+    //cout << "number of nodes " << interpolated_nodes.size() << endl;
 
     if(i == (interpolated_nodes.size() - 1)){
       if(TESTING_ENABLED){
@@ -1185,7 +556,7 @@ void step_interpolated(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest
   //basic version without any interpolation
 
   //if the distance is larger than the max step length, the node is moved to the max step 
-  cout << "step_interpolated: original distance " << l << endl;
+  //cout << "step_interpolated: original distance " << l << endl;
   if(l > max_step){
    //geometric computation of new coordiantes which satisfy the maximal distance of generated point to nearest atom in rr tree
    new_x = x_differential - kx * cos(alfa) * cos(beta) * l_from_source_to_goal;
@@ -1358,35 +729,6 @@ MPNN::MultiANN<double>* new_frame_initalisation(){
 
 
 
-void build_tree(int is_global){
-  
-    int *topology = new int[dimension];
-    MPNN::ANNcoord *scale = new MPNN::ANNcoord[dimension];
-    for(int i=0;i<dimension;i++) {
-      scale[i] = 1;
-      topology[i] = 1;
- 
-    }
-    if(is_global == GLOBAL){
-      global_kdTree = new MPNN::MultiANN<double>(dimension,1,topology,(MPNN::ANNpoint)scale);
-    } else {
-      local_priority_kdTree = new MPNN::MultiANN<double>(dimension,1,topology,(MPNN::ANNpoint)scale);
-    }
-    delete [] topology;
-    delete [] scale;
-}
-
-int add_to_tree(double* loc_coord, int tree_index, MPNN::MultiANN<double>* kdTree){
-    //std::cout << "print " <<endl;
-    MPNN::ANNpoint annpt = MPNN::annAllocPt(dimension);  
-    annpt[0] = loc_coord[0];
-    annpt[1] = loc_coord[1];
-    annpt[2] = loc_coord[2];
-    //print_vector(loc_coord);
-    //std::cout << annpt[0] << " " << annpt[1] << " " << annpt[2] << endl;
-    kdTree->AddPoint(annpt,tree_index); 
-    MPNN::annDeallocPt(annpt);
-}
 int find_nearest_vertex(double* loc_coord, MPNN::MultiANN<double>* kdTree){
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
@@ -1507,7 +849,7 @@ int main(int argc, char *argv[])
       write_paths_to_pdbs(directory_name,paths);
     }
   }
-  cout << "copies count " << copies_count << endl;
+  //cout << "copies count " << copies_count << endl;
   std::ofstream blocking_file;
   blocking_file.open("blocking_spheres.pdb");
   write_to_pdb(blocking_file, blocking_spheres_in_vertices);

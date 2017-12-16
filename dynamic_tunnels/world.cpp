@@ -12,6 +12,8 @@
 
 #include "world.h"
 #include "ozcollide/ozcollide.h"
+#include "MPNN/include/DNN/multiann.h"
+#include "MPNN/include/DNN/ANN.h"
 
 using namespace std;
 using namespace ozcollide;
@@ -45,7 +47,32 @@ double probe_radius; //radius of sphere protein probe
 double test_sphere_radius; // radius of sphere used to find if point is inside protein structure
 bool use_caver_dupcheck;
 double inside_sampling_bias;
-//----
+//---- variables for recording time spent in various methods
+double nearest_neighbor_search_time = 0;
+double tunnel_optimization_time = 0;
+double centring_time = 0;
+double collision_check_time = 0;
+double duplication_check_time = 0;
+
+//--- trees for nearest neighbor search
+MPNN::MultiANN<double> *global_kdTree;
+MPNN::MultiANN<double> *local_priority_kdTree;
+Tree* local_priority_kdTree_coordinates; //exists only because dumbass MPNN doesn't support delete, kepts coordinates of local kd Tree
+Tree* global_tree_points;                //to:do
+std::vector <shared_ptr<Path>> paths;        //here are the fpund paths kept, all nodes in them are copied, therefore there isn't problem with deleting
+                                  //their nodes everywhere. However, that doesn't protect you, if you want to access the node in main structure!
+                                  //All nodes have related indices in main structure, however there is no guarantee that the ones in main structure
+                                  //weren't deleted!
+
+//--- identificators of global/local kd_tree for easier reading
+const int NONE = 0;
+const int GLOBAL = 1; 
+const int LOCAL = 2;
+const int BOTH = 3;
+//--- current index serving as key inside kdtree
+int tree_index = 0;
+const int dimension = 3;
+
 
 //---- global variables used in whole program
 int cur_frame = 1; //frame which is currently used

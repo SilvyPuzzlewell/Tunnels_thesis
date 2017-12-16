@@ -16,3 +16,9 @@ analysis/config\.txt\.save
 visualization/
 
 dynamic_tunnels/computed_at_night/
+
+*.pdb
+
+*.swp
+
+*.txt

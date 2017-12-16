@@ -296,7 +296,7 @@ void Tree::add_node(shared_ptr<vertex> node){
 }
 
 void Tree::delete_node(int index){
-	std::cout << "Tree: deleted node " << index << endl; 
+	//std::cout << "Tree: deleted node " << index << endl; 
 	path_vertices.erase(index);
 }
 

@@ -5,9 +5,14 @@
 #include <map>
 #include <memory>
 #include "ozcollide/ozcollide.h"
+#include "MPNN/include/DNN/multiann.h"
+#include "MPNN/include/DNN/ANN.h"
+
+
 #define M_PI 3.14159265358979323846
 
 using namespace std;
+
 
 extern int world_size_x; extern int world_size_y; extern int world_size_z; extern int world_size_x_shift; extern int world_size_y_shift; extern int world_size_z_shift;
 
@@ -23,6 +28,19 @@ extern int iterations;
 extern double min_distance_to_goal;
 extern bool use_caver_dupcheck;
 extern double inside_sampling_bias;
+
+//variables spend for recording time in various methods
+extern double nearest_neighbor_search_time;
+extern double tunnel_optimization_time;
+extern double centring_time;
+extern double collision_check_time;
+extern double duplication_check_time;
+
+//trees for nearest neighbor search
+extern MPNN::MultiANN<double> *global_kdTree;
+extern MPNN::MultiANN<double> *local_priority_kdTree;
+
+
 
 
 
@@ -178,5 +196,20 @@ extern ozcollide::AABBTreeSphere* protein_tree;
 extern double probe_radius;
 extern double test_sphere_radius;
 
+extern Tree* local_priority_kdTree_coordinates; //exists only because dumbass MPNN doesn't support delete, kepts coordinates of local kd Tree
+extern Tree* global_tree_points;                //to:do
+extern vector <shared_ptr<Path>> paths;        //here are the fpund paths kept, all nodes in them are copied, therefore there isn't problem with deleting
+                                  //their nodes everywhere. However, that doesn't protect you, if you want to access the node in main structure!
+                                  //All nodes have related indices in main structure, however there is no guarantee that the ones in main structure
+
+//--- identificators of global/local kd_tree for easier reading
+extern const int NONE;
+extern const int GLOBAL; 
+extern const int LOCAL;
+extern const int BOTH;
+//---
+
+extern int tree_index;
+extern const int dimension; //kd tree dimension
 
 #endif
