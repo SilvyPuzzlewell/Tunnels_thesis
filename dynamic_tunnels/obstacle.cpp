@@ -33,7 +33,7 @@ vertex::vertex(double* location_coordinates_raw, shared_ptr<vertex> parent_point
 vertex::vertex(double* location_coordinates_raw, int index, double radius, int cur_frame, bool local){
     double* location_coordinates = new double[3]; location_coordinates[0] = location_coordinates_raw[0]; location_coordinates[1] = location_coordinates_raw[1]; location_coordinates[2] = location_coordinates_raw[2];
 	this->location_coordinates = location_coordinates;
-	parent_pointer = NULL;
+	//parent_pointer = NULL;
 	this->radius = radius;
 	this->index = index;
 	this->local = local;
@@ -51,7 +51,7 @@ vertex::~vertex(){
 	children_pointers.clear();
 	vertex_counter--;
 }
-	shared_ptr<vertex> vertex::copy(){
+shared_ptr<vertex> vertex::copy(){
 	shared_ptr<vertex> ret = this->copy_without_structure_pointers();
 	ret->children_pointers = this->children_pointers;
 	ret->valid_frames = this->valid_frames;
@@ -128,10 +128,10 @@ void vertex::add_child_pointer(shared_ptr<vertex> child, bool print_output){
 }
 
 bool vertex::is_child_local(int index){
-	return children_pointers[index]->is_local();
+	return children_pointers[index].lock()->is_local();
 }
 bool vertex::is_parent_local(){
-	return parent_pointer->is_local();
+	return parent_pointer.lock()->is_local();
 }
 void vertex::make_global(){
 	local = false;
@@ -154,10 +154,10 @@ bool vertex::is_local(){
 }
 
 int vertex::get_parent_index(){
-	if(parent_pointer == NULL){
+	if(parent_pointer.expired()){
 		return -1;
 	}
-	return parent_pointer->get_index();
+	return parent_pointer.lock()->get_index();
 }
 
 int vertex::get_child_index(){
@@ -166,22 +166,23 @@ int vertex::get_child_index(){
 		exit(0);
 		return -1;
 	}
-	return (*children_pointers.begin())->get_index();
+	return (*children_pointers.begin()).lock()->get_index();
 }
 
-shared_ptr<vertex> vertex::get_child_pointer(int index){
+weak_ptr<vertex> vertex::get_child_pointer(int index){
 	if(children_pointers.size() == 0){
 		cerr << "vertex:: get_child_pointer error - no child!" << endl;
-		return NULL;
+		//can't use null
+		return weak_ptr<vertex>(); 
 	}
-	shared_ptr<vertex> ret = *(children_pointers.begin() + index);
-	if(ret == NULL){
+	weak_ptr<vertex> ret = *(children_pointers.begin() + index);
+	if(ret.expired()){
 		cerr << "vertex:: get_child_pointer error - returning null pointer!" << endl;
 	}
 	return ret;
 }
 
-shared_ptr<vertex> vertex::get_child_pointer(){
+weak_ptr<vertex> vertex::get_child_pointer(){
 	if(children_pointers.size() == 1){
 		return children_pointers[0];
 	} else if(children_pointers.size() > 1){
@@ -195,7 +196,7 @@ shared_ptr<vertex> vertex::get_child_pointer(){
 
 }
 
-shared_ptr<vertex> vertex::get_child_pointer_null_permisive(){
+weak_ptr<vertex> vertex::get_child_pointer_null_permisive(){
 	if(children_pointers.size() == 1){
 		return children_pointers[0];
 	} else if(children_pointers.size() > 1){
@@ -204,7 +205,7 @@ shared_ptr<vertex> vertex::get_child_pointer_null_permisive(){
 		return children_pointers[0];
 	}
 
-	return NULL;	
+	return weak_ptr<vertex>();	
 }
 
 
@@ -246,17 +247,17 @@ int vertex::get_child_index(int index){
 	if(children_pointers.size() == 0){
 		cerr << "vertex::get_child_index(int index): attempt to get child of childless node!" << endl;
 	}
-	return children_pointers[index]->get_index();
+	return children_pointers[index].lock()->get_index();
 }
 
-shared_ptr<vertex> vertex::get_parent_pointer(){
-	if(parent_pointer == NULL){
+weak_ptr<vertex> vertex::get_parent_pointer(){
+	if(parent_pointer.expired()){
 		cerr << "vertex::get_parent_pointer(): program is trying to return null parent pointer" << endl;
 	}
 	return parent_pointer;
 }
 
-shared_ptr<vertex> vertex::get_parent_pointer_null_permisive(){
+weak_ptr<vertex> vertex::get_parent_pointer_null_permisive(){
 	return parent_pointer;
 }
 
@@ -267,13 +268,17 @@ Path::Path(int beginning_index, int endpoint_index, int current_frame): beginnin
 
 void print_ownership(std::map<int, shared_ptr<vertex>> map, string message){
 	int counter = 0;
+	cout << endl;
 	for(std::map<int, shared_ptr<vertex>>::iterator iterator = map.begin(); iterator != map.end(); iterator++){
 	counter++;
+	
 	if(counter > 6){
 		break;
 	}
+	
     cout << message << iterator->second.use_count() << endl;
    }
+   cout<<endl;
 }
 
 Path::~Path(){
@@ -283,18 +288,22 @@ Path::~Path(){
 	map<int, shared_ptr<vertex>> tempVector;
 	path_vertices.swap(tempVector);
 	*/
+print_ownership(path_vertices, "BEFORE DELET");
+  //---cyclic ownership shared_ptr memory leak happens without this 
+  	print_ownership(path_vertices, "BEFORE DELET");	
+  	/*
+	for(std::map<int, shared_ptr<vertex>>::iterator iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
+  		if(iterator->second->get_parent_pointer_null_permisive() != NULL){
+	  		iterator->second->get_parent_pointer().reset();
+	  		iterator->second->get_parent_pointer();
+		}
+  		if(iterator->second->get_children_count() > 0){
+	  		iterator->second->get_child_pointer().reset();
+		}
+	}
+	*/
+	print_ownership(path_vertices, "AFTER DELET");
 
-  //---cyclic ownership shared_ptr memory leak happens without this 	
-  for(std::map<int, shared_ptr<vertex>>::iterator iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
-  	iterator->second->get_parent_pointer().reset();
-  	iterator->second->get_child_pointer().reset();
-   }
-  //---
-
-
-   //print_ownership(path_vertices, "BEFORE DELET");
-	
-	
 	while(N_representation.size() != 0){
 		double* deleted_ptr = N_representation.back();
 		delete [] deleted_ptr;
@@ -365,32 +374,32 @@ double* Tree::get_node_coordinates(int index){
 
 //wrapper function for deleting nodes from path without damaging it's structure
 void Path::erase_node_with_reconnecting(int index){
-	shared_ptr<vertex> parent_pointer = path_vertices[index]->get_parent_pointer_null_permisive();
-	shared_ptr<vertex> child_pointer = path_vertices[index]->get_child_pointer_null_permisive();
-	if(parent_pointer != NULL){
+	weak_ptr<vertex> parent_pointer = path_vertices[index]->get_parent_pointer_null_permisive();
+	weak_ptr<vertex> child_pointer = path_vertices[index]->get_child_pointer_null_permisive();
+	if(!parent_pointer.expired()){
 	//	cout << "debug parent_index " << parent_pointer->get_index() << endl;
 	//	cout << "debug parent pointer " << parent_pointer << " local " << parent_pointer->is_local() <<endl;
 
 	}
-	if(child_pointer != NULL){
+	if(!child_pointer.expired()){
 	//	cout << "debug child_index " << child_pointer->get_index() << endl;
 	//	cout << "debug child pointer " << child_pointer << " local " <<child_pointer->is_local() <<endl;
 	}
 
-    if(parent_pointer != NULL && child_pointer != NULL){
+    if(!parent_pointer.expired() && !child_pointer.expired()){
     //	cout << "debug = opt 1" << endl;
-		parent_pointer->set_child_pointer(child_pointer); // connect parent node to it's child
-		child_pointer->set_parent_pointer(parent_pointer);
-	} else if(parent_pointer == NULL && child_pointer != NULL){
+		parent_pointer.lock()->set_child_pointer(child_pointer.lock()); // connect parent node to it's child
+		child_pointer.lock()->set_parent_pointer(parent_pointer.lock());
+	} else if(parent_pointer.expired() && !child_pointer.expired()){
 	//	cout << "debug = opt 2" << endl;
 		cerr << "warning -- deleted root path node" << endl;
-		child_pointer->set_parent_pointer(NULL);
-		beginning_index = child_pointer->get_index();
-	} else if(parent_pointer != NULL && child_pointer == NULL){
+		child_pointer.lock()->set_parent_pointer(NULL);
+		beginning_index = child_pointer.lock()->get_index();
+	} else if(!parent_pointer.expired() && child_pointer.expired()){
 	//	cout << "debug = opt 3" << endl;
 	//	cout << "parent pointer " << parent_pointer << endl;
-		parent_pointer->set_child_pointer(NULL);
-		endpoint_index = parent_pointer->get_index();
+		parent_pointer.lock()->set_child_pointer(NULL);
+		endpoint_index = parent_pointer.lock()->get_index();
 	} else {
 	//	cout << "debug = opt 4" << endl;
 		cerr << "Path::erase_node_with_reconnecting(int index): deleting from one atom path!!" << endl;
@@ -450,7 +459,7 @@ void Path::set_beginning_index(int beginning_index){
 	this->beginning_index = beginning_index;
 }
 int Path::get_child_index(int index){
-	return path_vertices[index]->get_child_pointer(0)->get_index();
+	return path_vertices[index]->get_child_pointer(0).lock()->get_index();
 }
 
 void Tree::print_nodes(){

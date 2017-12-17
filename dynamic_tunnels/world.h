@@ -50,8 +50,8 @@ class vertex {
   vector<int> valid_frames; // frames in which this vertex is valid, should be sorted from lowest
   int exists_in_path;        // pointer into path in which the index; paths doesn't have explicit indexing, index into vector "paths" is used, this method expects paths in "paths" to not be deleted, if they are, this will cause crash
                             // or invalid results!
-  vector<shared_ptr<vertex>> children_pointers;
-  shared_ptr<vertex> parent_pointer;
+  vector<weak_ptr<vertex>> children_pointers;
+  weak_ptr<vertex> parent_pointer;
 
   bool local;
   double* location_coordinates;
@@ -89,16 +89,16 @@ class vertex {
   bool is_parent_local();
   void make_global();
   int get_parent_index();
-  shared_ptr<vertex> get_parent_pointer();
+  weak_ptr<vertex> get_parent_pointer();
   void set_parent_pointer(shared_ptr<vertex> parent_pointer);
 
   int get_child_index(); //used for path nodes
   void set_child_pointer(shared_ptr<vertex> child_pointer);//used for path nodes
-  shared_ptr<vertex> get_child_pointer();
+  weak_ptr<vertex> get_child_pointer();
 
 
   int get_child_index(int index); //for iterating over children_pointers vector, index is into the vector
-  shared_ptr<vertex> get_child_pointer(int index);
+  weak_ptr<vertex> get_child_pointer(int index);
 
   void delete_child(int index); //index is into the structure, not node index!
 
@@ -108,8 +108,8 @@ class vertex {
   double get_radius();
   double* get_location_coordinates();
 
-  shared_ptr<vertex> get_child_pointer_null_permisive();
-  shared_ptr<vertex> get_parent_pointer_null_permisive();
+  weak_ptr<vertex> get_child_pointer_null_permisive();
+  weak_ptr<vertex> get_parent_pointer_null_permisive();
   
 }; 
 

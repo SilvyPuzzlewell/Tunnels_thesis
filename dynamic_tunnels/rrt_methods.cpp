@@ -161,7 +161,7 @@ void cut_subtree_in_main_tree_recursion(shared_ptr<vertex> cur, bool has_debuggi
       cout << "bef "<< cur->children_indices.size() << endl;  
     } 
     */ 
-    shared_ptr<vertex> next = cur->get_child_pointer(cur->get_children_count() -1); 
+    shared_ptr<vertex> next = cur->get_child_pointer(cur->get_children_count() -1).lock(); 
     cut_subtree_in_main_tree_recursion(next, has_debugging_output, next->is_local()); 
     if(has_debugging_output){ 
       cout << "aft "<< cur->get_children_count() << endl;  
@@ -186,7 +186,7 @@ void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debu
   } 
   //cout << "is first local? " << first_delet_node->is_local() << endl; 
   first_delet_node->is_local() ? node_in_tree = local_priority_kdTree_coordinates->get_node_pointer(first_delet_node->get_index()) : node_in_tree = global_tree_points->get_node_pointer(first_delet_node->get_index()); 
-  parent_node_in_tree = node_in_tree->get_parent_pointer(); 
+  parent_node_in_tree = node_in_tree->get_parent_pointer().lock(); 
   bool found = false; 
   //cout << "path_index " << first_delet_node->get_index() << " path parent index "<< parent_path->get_index()<<" tree_index " << node_in_tree->get_index() << endl; 
   for(int i = 0; i < parent_node_in_tree->get_children_count(); i++){ 
