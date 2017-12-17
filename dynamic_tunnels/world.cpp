@@ -12,20 +12,24 @@
 
 #include "world.h"
 #include "ozcollide/ozcollide.h"
+#include "support_methods.h"
 #include "MPNN/include/DNN/multiann.h"
 #include "MPNN/include/DNN/ANN.h"
 
 using namespace std;
 using namespace ozcollide;
 void create_spheres(const std::vector<Ball*> &balls);
-vector<Ball*>& add_ball(double x, double y, double z, double radius, vector<Ball*> &balls);
-vector<Ball*>& add_ball(double* loc_coord, double radius, vector<Ball*> &balls);
+vector<shared_ptr<Ball>>& add_ball(double x, double y, double z, double radius, vector<shared_ptr<Ball>> &balls);
+//vector<Ball*>& add_ball(double* loc_coord, double radius, vector<Ball*> &balls);
 void delete_protein_structure();
-AABBTreeSphere* build_protein_structure(const vector<Ball*> &balls);
+AABBTreeSphere* build_protein_structure(const vector<shared_ptr<Ball>> &balls);
 
 AABBTreeSphere* protein_tree;
 AABBTreeSphere* blocking_spheres_tree;
-vector<Ball*> blocking_spheres;
+
+
+vector<shared_ptr<Ball>> blocking_spheres;
+vector<shared_ptr<Ball>> protein_balls;
 
 bool TESTING_ENABLED = true;
 
@@ -72,6 +76,9 @@ const int BOTH = 3;
 //--- current index serving as key inside kdtree
 int tree_index = 0;
 const int dimension = 3;
+
+//---
+
 
 
 //---- global variables used in whole program
@@ -205,8 +212,8 @@ void load_parameters(string config_filename){
   
  
 }
-vector<Ball*> atoms_from_file(string coords_file){
-  vector <Ball*> balls; 
+vector<shared_ptr<Ball>> atoms_from_file(string coords_file){
+  vector<shared_ptr<Ball>> balls;
   ifstream myfile(coords_file);
 
   string line;
@@ -252,7 +259,7 @@ vector<Ball*> atoms_from_file(string coords_file){
 
 void init_protein_struct(){
   //static tunnel detection problem assumed, uses file specified in config
-  vector<Ball*> atoms;
+  vector<shared_ptr<Ball>> atoms;
   if(!is_loaded_from_framesdir){
     atoms = atoms_from_file(coords_file);
   } else {
@@ -261,12 +268,12 @@ void init_protein_struct(){
     cout << ss.str() << endl;
     atoms = atoms_from_file(ss.str());
   }
-
+  cout << "atoms size bef " << atoms.size() <<endl; 
   protein_tree = build_protein_structure(atoms);
-  for(int i = 0; i < atoms.size(); i++){
-    delete atoms[i];   
-  }
+  cout << "atoms size aft " << atoms.size()<<endl; 
+  
   atoms.clear();
+  cout << "atoms size aft 2 " << atoms.size()<<endl; 
 }
 
 void run_next_frame(){
@@ -281,7 +288,7 @@ void run_next_frame(){
 
 void rebuild_protein_structure(double* new_sphere_coords, bool add_sphere, string file_name){
   delete_protein_structure();
-  vector<Ball*> atoms = atoms_from_file(file_name);
+  vector<shared_ptr<Ball>> atoms = atoms_from_file(file_name);
  // cout << new_sphere_coords[0] << " " << new_sphere_coords[1] << " " << new_sphere_coords[2] << endl;
   //if(add_sphere)add_ball(new_sphere_coords[0], new_sphere_coords[1], new_sphere_coords[2], test_sphere_radius, blocking_spheres);
   for(int i = 0; i < blocking_spheres.size(); i++){
@@ -291,35 +298,40 @@ void rebuild_protein_structure(double* new_sphere_coords, bool add_sphere, strin
 }
 void rebuild_blocking_spheres_structure(double* obstacle_loccoord, double radius){
   if(blocking_spheres.size() != 0) delete blocking_spheres_tree;
- 
-  Ball* obstacle = new Ball(obstacle_loccoord, radius);
-  blocking_spheres.push_back(obstacle);
+  
+  blocking_spheres = add_ball(obstacle_loccoord[0], obstacle_loccoord[1], obstacle_loccoord[2], radius, blocking_spheres);
   
   blocking_spheres_tree = build_protein_structure(blocking_spheres);
   
-  //mem error if there is only one sphere in tree for unknown reason
+   
+  //mem error if there is only one sphere in tree for unknown reason(bug?)
   if(blocking_spheres.size() == 1){
     rebuild_blocking_spheres_structure(obstacle_loccoord, radius);
   }
+  
   //cout << "num l out" << blocking_spheres_tree->getNbLeafs() << endl;
 }
 
 
-vector<Ball*>& add_ball(double x, double y, double z, double radius, vector<Ball*> &balls){
-  double* obstacle_loccoord = new double[3]; obstacle_loccoord[0] = x; obstacle_loccoord[1] = y; obstacle_loccoord[2] = z;
-  Ball* obstacle = new Ball(obstacle_loccoord, radius);
+vector<shared_ptr<Ball>>& add_ball(double x, double y, double z, double radius, vector<shared_ptr<Ball>> &balls){
+  shared_ptr<Ball> obstacle = make_shared<Ball>(x, y, z, radius);
   balls.push_back(obstacle);
   return balls;
 }
+
+/*
 vector<Ball*>& add_ball(double* loc_coord, double radius, vector<Ball*> &balls){
   Ball* obstacle = new Ball(loc_coord, radius);
   balls.push_back(obstacle);
   return balls;
 }
+*/
 
 
-AABBTreeSphere* build_protein_structure(const vector<Ball*> &balls){
+AABBTreeSphere* build_protein_structure(const vector<shared_ptr<Ball>> &balls){
   Sphere* spheres = new Sphere[balls.size()];
+
+  cout << "ball size " << balls.size() << endl;
 
   for(int i=0;i<(int)balls.size(); i++) {
     spheres[i].center.x = balls[i]->location_coordinates[0];

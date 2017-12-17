@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <string>
 #include "ozcollide/ozcollide.h"
 #include "MPNN/include/DNN/multiann.h"
 #include "MPNN/include/DNN/ANN.h"
@@ -182,10 +183,12 @@ extern int get_frames_count();
 extern void run_next_frame();
 extern void delete_blocking_spheres();
 
+extern void print_ownership(std::map<int, shared_ptr<vertex>> map, string message);
+
 //for occollide
 class Ball{
  public:
-  Ball(double* location_coordinates, double radius);
+  Ball(double x, double y, double z, double radius);
   ~Ball();
   
   static int counter;

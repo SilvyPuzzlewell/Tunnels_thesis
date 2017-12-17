@@ -1,6 +1,7 @@
 #include <cmath>
 #include "world.h"
 #include "ozcollide/ozcollide.h"
+#include "support_methods.h"
 #include <iostream>
 #include <string.h>
 #include <memory>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <utility> 
 #include <unistd.h>
+#include <string>
 using namespace std;
 
 
@@ -49,8 +51,8 @@ vertex::~vertex(){
 	children_pointers.clear();
 	vertex_counter--;
 }
-shared_ptr<vertex> vertex::copy(){
-	shared_ptr<vertex> ret = make_shared<vertex>(this->location_coordinates, this->parent_pointer, this->index, this->radius, -1, this->local);
+	shared_ptr<vertex> vertex::copy(){
+	shared_ptr<vertex> ret = this->copy_without_structure_pointers();
 	ret->children_pointers = this->children_pointers;
 	ret->valid_frames = this->valid_frames;
 	return ret;
@@ -59,6 +61,7 @@ shared_ptr<vertex> vertex::copy(){
 shared_ptr<vertex> vertex::copy_without_structure_pointers(){
 	shared_ptr<vertex> ret = make_shared<vertex>(this->location_coordinates,this->index, this->radius, -1, this->local);
 	ret->valid_frames = this->valid_frames;
+	//cout << "SHARED COPIED " << ret.use_count() << endl;
 	return ret;
 }
 double* vertex::copy_coordinates(){
@@ -261,12 +264,43 @@ Path::Path(int beginning_index, int endpoint_index, int current_frame): beginnin
 	valid_frames.push_back(current_frame);
 }
 
+
+void print_ownership(std::map<int, shared_ptr<vertex>> map, string message){
+	int counter = 0;
+	for(std::map<int, shared_ptr<vertex>>::iterator iterator = map.begin(); iterator != map.end(); iterator++){
+	counter++;
+	if(counter > 6){
+		break;
+	}
+    cout << message << iterator->second.use_count() << endl;
+   }
+}
+
 Path::~Path(){
+	//cout << "DELET PATH" << endl;
+
+	/*
+	map<int, shared_ptr<vertex>> tempVector;
+	path_vertices.swap(tempVector);
+	*/
+
+  //---cyclic ownership shared_ptr memory leak happens without this 	
+  for(std::map<int, shared_ptr<vertex>>::iterator iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
+  	iterator->second->get_parent_pointer().reset();
+  	iterator->second->get_child_pointer().reset();
+   }
+  //---
+
+
+   //print_ownership(path_vertices, "BEFORE DELET");
+	
+	
 	while(N_representation.size() != 0){
 		double* deleted_ptr = N_representation.back();
 		delete [] deleted_ptr;
 		N_representation.pop_back();
 	}
+	
 }
 
 
@@ -427,8 +461,8 @@ void Tree::print_nodes(){
 	cout << "--printing path--end--" << endl;
 }
 
-Ball::Ball(double* location_coordinates_raw, double radius){
-	double* location_coordinates = new double[3]; location_coordinates[0] = location_coordinates_raw[0]; location_coordinates[1] = location_coordinates_raw[1]; location_coordinates[2] = location_coordinates_raw[2];
+Ball::Ball(double x, double y, double z, double radius){
+	double* location_coordinates = new double[3]; location_coordinates[0] = x; location_coordinates[1] = y; location_coordinates[2] = z;
 	this->location_coordinates = location_coordinates;
 	this->radius = radius;
 	counter++;

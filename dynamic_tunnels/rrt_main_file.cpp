@@ -115,10 +115,13 @@ shared_ptr<vertex> copy_node_tree_to_path(shared_ptr<Path> path, shared_ptr<vert
 
 
   shared_ptr<vertex> path_cur_node = tree_node->copy_without_structure_pointers();
+  //cout << "COUNT 1 " << path_cur_node.use_count() << endl;
   path_cur_node->set_frame_index(cur_frame);
   path_cur_node->add_child_pointer(path_child_node, false);
   path_child_node->set_parent_pointer(path_cur_node);
+  //cout << "COUNT 2 " << path_cur_node.use_count() << endl;
   path->add_node(path_cur_node);
+  //cout << "COUNT 3 " << path_cur_node.use_count() << endl;
 
 
 
@@ -163,8 +166,9 @@ shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){
     child_pointer = copy_node_tree_to_path(path, cur, child_pointer, nearest_frame);
   }
   path->set_beginning_index(cur->get_index()); 
-  
+  print_ownership(path->get_vertices(), "PATH");
   return path;
+  
 }
 
 //initializes k-d tree, puts initial vertex with parent index -1, symbolizing it hasn't got a parent, into tree map
@@ -372,9 +376,9 @@ int is_duplicated(shared_ptr<Path> tested__path){
 
 void add_blocking_sphere(double* coordinates, double radius){
   static int blocking_spheres_counter = 0;
- shared_ptr<vertex> blocking_sphere = make_shared<vertex>(coordinates, 0, radius, get_current_frame(), true); //don't care about index
- blocking_spheres_in_vertices.insert(std::pair<int,shared_ptr<vertex>>(blocking_spheres_counter,blocking_sphere));
- blocking_spheres_counter++;
+ //shared_ptr<vertex> blocking_sphere = make_shared<vertex>(coordinates, 0, radius, get_current_frame(), true); //don't care about index
+ // blocking_spheres_in_vertices.insert(std::pair<int,shared_ptr<vertex>>(blocking_spheres_counter,blocking_sphere));
+ //blocking_spheres_counter++;
  rebuild_blocking_spheres_structure(coordinates, radius);
  
 
@@ -470,7 +474,9 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
     //cout << "colliding ? " << is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES) << endl;
 
     if(!(is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES))){
-      interpolated_nodes.push_back(make_shared<vertex>(copy_array_to_coordinate_pointer(new_coordinates), 0, probe_radius, get_current_frame(), true));
+      double* coords = copy_array_to_coordinate_pointer(new_coordinates);
+      interpolated_nodes.push_back(make_shared<vertex>(coords, 0, probe_radius, get_current_frame(), true));
+      delete [] coords;
       if(is_new_first_valid){
         first_valid = interpolated_nodes.size() - 1;
         is_new_first_valid = false;
