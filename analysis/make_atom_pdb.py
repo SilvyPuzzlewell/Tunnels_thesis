@@ -1,14 +1,14 @@
 import os
 
 #edited tunnels are saved in ./caver_tunnels folder named by their respective number
-newpath = '/home/ron/Bak/dynamic_tunnels/analysis/caver_tunnels' 
+newpath = '/home/fif/bak_repository/dynamic_tunnels/analysis/caver_tunnels' 
 if not os.path.exists(newpath):
     os.makedirs(newpath)
 tunnels_directory = os.listdir(newpath)
 for file in tunnels_directory:
 	os.remove(newpath+"/"+file)
 #path to caver tunnels
-dir_path = "/home/ron/Bak/caver/examples/QUICK_START/inputs/out/data/clusters_timeless"
+dir_path = "/home/fif/Bak/caver/examples/QUICK_START/inputs/out/data/clusters_timeless"
 tunnels = os.listdir(dir_path)
 
 for file in tunnels:

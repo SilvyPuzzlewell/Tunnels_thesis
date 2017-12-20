@@ -22,7 +22,9 @@ void create_spheres(const std::vector<Ball*> &balls);
 vector<shared_ptr<Ball>>& add_ball(double x, double y, double z, double radius, vector<shared_ptr<Ball>> &balls);
 //vector<Ball*>& add_ball(double* loc_coord, double radius, vector<Ball*> &balls);
 void delete_protein_structure();
-AABBTreeSphere* build_protein_structure(const vector<shared_ptr<Ball>> &balls);
+void delete_blocking_spheres(bool is_vector_cleared);
+AABBTreeSphere* build_collision_structure(const vector<shared_ptr<Ball>> &balls, bool output);
+
 
 AABBTreeSphere* protein_tree;
 AABBTreeSphere* blocking_spheres_tree;
@@ -78,7 +80,7 @@ int tree_index = 0;
 const int dimension = 3;
 
 //---
-
+bool is_blocking_spheres_tree_initialized = false;
 
 
 //---- global variables used in whole program
@@ -268,12 +270,12 @@ void init_protein_struct(){
     cout << ss.str() << endl;
     atoms = atoms_from_file(ss.str());
   }
-  cout << "atoms size bef " << atoms.size() <<endl; 
-  protein_tree = build_protein_structure(atoms);
-  cout << "atoms size aft " << atoms.size()<<endl; 
+ // cout << "atoms size bef " << atoms.size() <<endl; 
+  protein_tree = build_collision_structure(atoms, false);
+  //cout << "atoms size aft " << atoms.size()<<endl; 
   
   atoms.clear();
-  cout << "atoms size aft 2 " << atoms.size()<<endl; 
+  //cout << "atoms size aft 2 " << atoms.size()<<endl; 
 }
 
 void run_next_frame(){
@@ -281,6 +283,10 @@ void run_next_frame(){
   if(cur_frame == 2){  //expecting small inter-frame changes, it doesn't make much sense to run as many iterations as in the original
     iterations *= REPEATED_RUN_ITERATIONS_COEFFICIENT;
   }
+
+  //blocking_spheres.clear();
+  //blocking_spheres_tree = build_protein_structure(blocking_spheres);
+  delete_blocking_spheres(true);
   delete_protein_structure();
   init_protein_struct();
 }
@@ -294,14 +300,20 @@ void rebuild_protein_structure(double* new_sphere_coords, bool add_sphere, strin
   for(int i = 0; i < blocking_spheres.size(); i++){
     atoms.push_back(blocking_spheres[i]);
   }
-  protein_tree = build_protein_structure(atoms);
+  protein_tree = build_collision_structure(atoms, false);
 }
 void rebuild_blocking_spheres_structure(double* obstacle_loccoord, double radius){
-  if(blocking_spheres.size() != 0) delete blocking_spheres_tree;
+  cout << "BLOCKING_SPHERES_STRUCTURE_SIZE " << blocking_spheres.size() << endl;
+  if(blocking_spheres.size() != 0) {
+    delete_blocking_spheres(false);
+  }
   
   blocking_spheres = add_ball(obstacle_loccoord[0], obstacle_loccoord[1], obstacle_loccoord[2], radius, blocking_spheres);
   
-  blocking_spheres_tree = build_protein_structure(blocking_spheres);
+  blocking_spheres_tree = build_collision_structure(blocking_spheres, true);
+  cout << "Size of the blocking spheres tree AFTER assignation " <<get_blocking_spheres_tree_size() << endl;
+  is_blocking_spheres_tree_initialized = true;
+
   
    
   //mem error if there is only one sphere in tree for unknown reason(bug?)
@@ -328,10 +340,10 @@ vector<Ball*>& add_ball(double* loc_coord, double radius, vector<Ball*> &balls){
 */
 
 
-AABBTreeSphere* build_protein_structure(const vector<shared_ptr<Ball>> &balls){
+AABBTreeSphere* build_collision_structure(const vector<shared_ptr<Ball>> &balls, bool output){
   Sphere* spheres = new Sphere[balls.size()];
 
-  cout << "ball size " << balls.size() << endl;
+  //cout << "ball size " << balls.size() << endl;
 
   for(int i=0;i<(int)balls.size(); i++) {
     spheres[i].center.x = balls[i]->location_coordinates[0];
@@ -342,6 +354,7 @@ AABBTreeSphere* build_protein_structure(const vector<shared_ptr<Ball>> &balls){
   
   AABBTreeSphere_Builder builder;
   AABBTreeSphere* tree = builder.build(balls.size(),spheres);
+  //if(output) cout << "NEW TREE SIZE " << tree->getNbLeafs() << endl;
   delete [] spheres;
   spheres = NULL;
   return tree;
@@ -351,8 +364,17 @@ void delete_protein_structure(){
   delete protein_tree;
 }
 
-void delete_blocking_spheres(){
-  //use shared ptr! it's impossible to hold on which one isn't already deleted
-  blocking_spheres.clear();
-  delete blocking_spheres_tree;
+void delete_blocking_spheres(bool is_vector_cleared){
+
+  if (get_blocking_spheres_tree() == NULL){
+    cout << "deleting NULL tree! " << endl;
+    return;
+  }
+  cout << "is_vector_cleared " << is_vector_cleared << endl;
+  cout << "Size of the blocking spheres tree BEFORE delet " <<get_blocking_spheres_tree_size() << endl;
+  if(is_blocking_spheres_tree_initialized) delete blocking_spheres_tree;
+  is_blocking_spheres_tree_initialized = false;
+
+  //cout << "Size of the blocking spheres tree AFTER delet " <<get_blocking_spheres_tree_size() << endl;
+  if(is_vector_cleared) blocking_spheres.clear();
 }

@@ -1,7 +1,7 @@
 from pymol import cmd
 from os import listdir
 
-dir_path = "/home/fif/Bak/dynamic_tunnels/found_tunnels/tunnels0"
+dir_path = "/home/fif/bak_repository/dynamic_tunnels/found_tunnels/tunnels0"
 tunnels = os.listdir(dir_path)
 cmd.cd(dir_path)
 

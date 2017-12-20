@@ -166,7 +166,6 @@ shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){
     child_pointer = copy_node_tree_to_path(path, cur, child_pointer, nearest_frame);
   }
   path->set_beginning_index(cur->get_index()); 
-  print_ownership(path->get_vertices(), "PATH");
   return path;
   
 }
@@ -386,7 +385,7 @@ void add_blocking_sphere(double* coordinates, double radius){
 
 void label_used_nodes(shared_ptr<Path> path, int path_index){
  // print_map_indices(path->get_vertices(), "debug");
-  cout << "labeling, frame " << get_current_frame() << endl;
+ // cout << "labeling, frame " << get_current_frame() << endl;
   if(get_current_frame() > 1){
  //   local_priority_kdTree_coordinates->print_nodes();
  //   global_tree_points->print_nodes();
@@ -394,7 +393,7 @@ void label_used_nodes(shared_ptr<Path> path, int path_index){
   for(std::map<int, shared_ptr<vertex>>::iterator iterator = path->get_vertices().begin(); iterator != path->get_vertices().end(); iterator++){
   //  cout <<"in main program " << iterator->second->index << " "<< path->ending_index << endl;
     if(get_current_frame() > 1){
-      cout << "labeling, is path node local? " << iterator->second->is_local() << "path node index " << iterator->second->get_index() << endl;
+   //   cout << "labeling, is path node local? " << iterator->second->is_local() << "path node index " << iterator->second->get_index() << endl;
     }
     iterator->second->is_local() ? local_priority_kdTree_coordinates->get_node_pointer(iterator->second->get_index())->set_in_path(path_index) : global_tree_points->get_node_pointer(iterator->second->get_index())->set_in_path(path_index);
     
@@ -669,10 +668,15 @@ void copy_to_global(){
   }
 }
 
+
+
 MPNN::MultiANN<double>* new_frame_initalisation(){
   if(get_current_frame() == 1 && LOCALIZED_MODE){
     global_tree_points = new Tree();
   }
+
+
+  //marks all paths as not found in new frame, therefore they can be added to counts of the same path in new frame if found again
   for (int i = 0; i < path_found_in_frame.size(); ++i) {
     path_found_in_frame[i] = false;
   }
@@ -699,7 +703,6 @@ MPNN::MultiANN<double>* new_frame_initalisation(){
   int i = 1;
   //checks endpoints of paths, if they are valid in current frame. If succeeds, the path is automatically valid in this frame too, cause it
   //always possible to connect it to previous' frame's one
-  delete_blocking_spheres();
   for (vector<shared_ptr<Path>>::iterator iterator = paths.begin(); iterator != paths.end(); iterator++){
     if(!is_in_obstacle((*iterator)->get_node_coordinates((*iterator)->get_endpoint_index()), test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
       (*iterator)->add_valid_frame(get_current_frame());

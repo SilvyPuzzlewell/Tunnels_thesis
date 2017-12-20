@@ -282,27 +282,6 @@ void print_ownership(std::map<int, shared_ptr<vertex>> map, string message){
 }
 
 Path::~Path(){
-	//cout << "DELET PATH" << endl;
-
-	/*
-	map<int, shared_ptr<vertex>> tempVector;
-	path_vertices.swap(tempVector);
-	*/
-print_ownership(path_vertices, "BEFORE DELET");
-  //---cyclic ownership shared_ptr memory leak happens without this 
-  	print_ownership(path_vertices, "BEFORE DELET");	
-  	/*
-	for(std::map<int, shared_ptr<vertex>>::iterator iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
-  		if(iterator->second->get_parent_pointer_null_permisive() != NULL){
-	  		iterator->second->get_parent_pointer().reset();
-	  		iterator->second->get_parent_pointer();
-		}
-  		if(iterator->second->get_children_count() > 0){
-	  		iterator->second->get_child_pointer().reset();
-		}
-	}
-	*/
-	print_ownership(path_vertices, "AFTER DELET");
 
 	while(N_representation.size() != 0){
 		double* deleted_ptr = N_representation.back();
@@ -316,6 +295,19 @@ print_ownership(path_vertices, "BEFORE DELET");
 void Path::add_valid_frame(int frame){
 	valid_frames.push_back(frame);
 }
+
+shared_ptr<vertex> Path::get_beginning_node(){
+	return path_vertices[this->get_beginning_index()];
+}
+
+shared_ptr<vertex> Path::get_endpoint_node(){
+	return path_vertices[this->get_endpoint_index()];
+}
+
+shared_ptr<vertex> Path::operator[](std::size_t idx){
+	return path_vertices[idx];
+}
+
 //it ia expected that nodes are copied to path, therefore deleting them does not cause mem corruption anywhere else
 Tree::~Tree(){
    path_vertices.clear();
@@ -415,7 +407,11 @@ void Path::add_N_point(double* N_point){ //added paths are never supposed to be 
 
 
 void Path::reset_N_representation(){
-	N_representation.clear();
+	while(N_representation.size() != 0){
+		double* deleted_ptr = N_representation.back();
+		delete [] deleted_ptr;
+		N_representation.pop_back();
+	} 
 }
 
 double* Path::get_N_point(int index){

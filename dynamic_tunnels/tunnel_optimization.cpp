@@ -271,7 +271,14 @@ void cut_tunnel(shared_ptr<Path> path){
 
   }
 
-  int deleted_index = path->get_child_index(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
+  cout << "path endpoint index " << path->get_endpoint_index() <<endl;
+  cout << "deleted node index " << vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1] <<endl;
+  int deleted_index = -1;
+  if(path->get_endpoint_index() != vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]){ //endpoint doesn't have child, would crash program
+    deleted_index = path->get_child_index(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
+  } else {
+    return;
+  }
   shared_ptr<vertex> cur = path->get_node_pointer(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
 
   int prev = path->get_size();
@@ -283,8 +290,25 @@ void cut_tunnel(shared_ptr<Path> path){
 }
 
 void smooth_tunnel(shared_ptr<Path> path){
+  path_nodes = path->get_vertices();
+  shared_ptr<vertex> cur = path_nodes
+  while(true){
+    while(true){
+
+    }
+  } 
   
 }
+
+Function OptimizationPhaseOneAlgorithmOne(initialTunnel)
+foreach i ∈ { 0, 1, ..., initialPath.size () − 1 } do
+foreach j ∈ { 0, 1, ..., initialPath.size () − 1 } do
+if collisionFree ( initialPath [ i ] , initialPath [ j ]) then
+initialPath ← deleteNodes ( initialPath, i, j ) ;
+end
+end
+end
+return initialPath;
 
 void center_tunnel(shared_ptr<Path> path){
   std::map<int, shared_ptr<vertex>>::iterator iterator;

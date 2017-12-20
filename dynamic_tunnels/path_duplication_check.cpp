@@ -173,8 +173,8 @@ bool create_N_representation(shared_ptr<Path> tunnel){
 	double* tunnel_beginning_coordinate = tunnel_map[start_index]->get_location_coordinates();
 	//we must subtract the distance from the tunnel's first to node to first node after getting rid of nodes within z_interval, so that we can start at zero, which is required
 	//for dividing into intervals correctly
-	cout << "entering test" << endl;
-	print_vector(tunnel_map[tunnel->get_beginning_index()]->get_location_coordinates());
+	//cout << "entering test" << endl;
+	//print_vector(tunnel_map[tunnel->get_beginning_index()]->get_location_coordinates());
 
 	int index = start_index;
 	std::vector<int> N_counts(N, 0);

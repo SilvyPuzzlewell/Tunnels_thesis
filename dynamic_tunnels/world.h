@@ -142,6 +142,8 @@ class Path: public Tree {
   int endpoint_index;
   //---
  public:
+  shared_ptr<vertex> operator[](std::size_t idx); 
+
   Path(int beginning_index, int endpoint_index, int current_frame);
   ~Path();
   void add_valid_frame(int index);
@@ -161,8 +163,8 @@ class Path: public Tree {
   int get_beginning_index();
   void set_beginning_index(int beginning_index);
 
-
-
+  shared_ptr<vertex> get_endpoint_node();
+  shared_ptr<vertex> get_beginning_node();
 };
 
 //todo - make world class
@@ -181,7 +183,6 @@ extern void rebuild_blocking_spheres_structure(double* obstacle_loccoord, double
 extern void load_parameters(string config_filename);
 extern int get_frames_count();
 extern void run_next_frame();
-extern void delete_blocking_spheres();
 
 extern void print_ownership(std::map<int, shared_ptr<vertex>> map, string message);
 
@@ -214,5 +215,7 @@ extern const int BOTH;
 
 extern int tree_index;
 extern const int dimension; //kd tree dimension
+
+
 
 #endif
