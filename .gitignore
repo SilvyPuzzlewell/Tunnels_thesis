@@ -22,3 +22,19 @@ dynamic_tunnels/computed_at_night/
 *.swp
 
 *.txt
+
+analysis/caver_tunnels/
+
+analysis/caver_tunnels_database/
+
+analysis/old_stuff/
+
+analysis/already_computed/
+
+jankovec/
+
+jd/
+
+analysis/stats
+
+analysis/stats_ThresholdNCointDepndatnt

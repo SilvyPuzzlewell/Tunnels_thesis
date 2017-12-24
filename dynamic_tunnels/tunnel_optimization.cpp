@@ -11,6 +11,10 @@
 using namespace std;
 using namespace std::chrono;
 
+double SMOOTHING_SUCCESS_THRESHOLD = 5;
+double MAXIMUM_SMOOTHING_DISTANCE = 0.8;
+
+
 
 
 
@@ -240,6 +244,8 @@ void smoothing(shared_ptr<Path> path){
   }
 }
 
+
+
 void cut_tunnel(shared_ptr<Path> path){
   std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
   std::vector<int> vertex_indices_to_be_deleted;
@@ -289,26 +295,236 @@ void cut_tunnel(shared_ptr<Path> path){
   
 }
 
-void smooth_tunnel(shared_ptr<Path> path){
-  path_nodes = path->get_vertices();
-  shared_ptr<vertex> cur = path_nodes
-  while(true){
-    while(true){
 
-    }
+
+bool delete_nodes_inbetween(shared_ptr<Path> path, shared_ptr<vertex> base, shared_ptr<vertex> target){
+
+  double  direction_vector_length = compute_metric_eucleidean(target->get_location_coordinates(), base->get_location_coordinates());
+ // cout << "direction vector length " << direction_vector_length << endl;
+  if(direction_vector_length <= min_step){
+    return false;
   } 
+  double* increment_vector = create_direction_vector(base, target, min_step);
+
+  //shared_ptr<vertex> cur = first;
+ // vector<shared_ptr<vertex>> interpolated_nodes;
+
+  //check if straight line is colliding
+  //applying to new found path nodes, no need to rebuild kdTrees and all new found path nodes are local
+  //until the length to target is smaller than min_step, try to add new node to straight line trajectory between and check for collisions
+  double* new_position = base->get_location_coordinates();
+  double* new_position_prev = copy_vector(new_position);
+  while(compute_metric_eucleidean(target->get_location_coordinates(), new_position_prev) > min_step){
+    new_position = add_vectors(new_position_prev, increment_vector, ADDITION);
+    delete [] new_position_prev;
+    if(!is_in_obstacle(new_position, probe_radius, CHECK_WITH_BLOCKING_SPHERES)){
+ //     cur = make_shared<vertex>(new_position, 0, probe_radius, get_current_frame(), true);
+ //     interpolated_nodes.push_back(cur);
+ //     cout << "distance " << compute_metric_eucleidean(target->get_location_coordinates(), new_position) <<endl;
+      new_position_prev = copy_vector(new_position);
+      delete [] new_position;
+    } else {
+//      cout << "colliding" << endl;
+      delete [] new_position;
+      delete [] increment_vector;
+      return false;
+    }
+  }
+
+  //..if not, delete all nodes in between 
+  shared_ptr<vertex> cur = base->get_child_pointer().lock();
+
+//  cout << "first " << cur->get_index() << endl;
+//  cout << "second " << target->get_index() << endl;
+//  cout << "endpoint " << path->get_endpoint_index() << endl;
+
+
+  while(cur->get_index() != target->get_index()){
+    path->erase_node_with_reconnecting(cur->get_index());
+//    cout << "in cur " << cur->get_index() << endl;
+ //   cout << "in second " << target->get_index() << endl;
+ //   cout << "in child " << cur->get_child_index() << endl;
+    cur = cur->get_child_pointer().lock();  
+  }
+  
+  delete [] increment_vector;
+  delete [] new_position_prev;
+  return true;
+}
+
+double smoothing_vol2(shared_ptr<Path> path){
+  int beginning_index = path->get_beginning_index(); 
+  //cout << path.size() << endl;
+  if(path->get_size() < 3){
+    return 0;
+  }
+
+  shared_ptr<vertex> cur = path->get_beginning_node();
+  shared_ptr<vertex> child = cur->get_child_pointer().lock()->get_child_pointer().lock();
+  int success_counter = 0;
+  int run_counter = 0;
+  while(true){
+
+    //too much space inbetween can lead trajectory which is not described by the spheres, there would be just empty space inbetween, which doesn't really matter
+    //for the trajectory itself, becaouse important information are extracted from it before the procedure, but is bad for visualization. It's up user to edit this parameter.
+   //cout <<  "dist " << compute_metric_eucleidean(cur->get_location_coordinates(), child->get_location_coordinates()) <<endl;
+   // cout <<  "param " << MAXIMUM_SMOOTHING_DISTANCE << endl;
+    if(compute_metric_eucleidean(cur->get_location_coordinates(), child->get_location_coordinates()) < MAXIMUM_SMOOTHING_DISTANCE){
+      if(delete_nodes_inbetween(path, cur, child)){
+        success_counter++; 
+      }
+    }  
+    run_counter++; 
+    
+    cur = child;
+    if(child->get_child_pointer_null_permisive().lock() == NULL || child->get_child_pointer().lock()->get_child_pointer_null_permisive().lock() == NULL){
+      break;
+    }
+    child = child->get_child_pointer().lock()->get_child_pointer().lock();
+  }
+  
+  //cout << ((double) success_counter / (double) run_counter) * 100 << endl;
+  return  ((double) success_counter / (double) run_counter) * 100;
+}
+
+
+void add_interpolated_node(shared_ptr<Path> path, shared_ptr<vertex> parent, shared_ptr<vertex> cur, shared_ptr<vertex> child){
+    int index = tree_index;
+    tree_index++;
+    cur->set_index(index);
+    cur->set_child_pointer(child);
+    cur->set_parent_pointer(parent);
+    path->add_node(cur);
+}
+
+void interpolate_nodes(shared_ptr<Path> path, shared_ptr<vertex> base, shared_ptr<vertex> target){
+
+  double  direction_vector_length = compute_metric_eucleidean(base->get_location_coordinates(), target->get_location_coordinates());
+  //there isn't any place to for a new node, happens if there wasn't any reconnection
+  if(direction_vector_length <= min_step){
+    return;
+  }
+ // cout << "OLD PATH SIZE " << path->get_vertices().size() << endl; 
+  //the increment vector among which the path segment will be interpolated
+  double* increment_vector = add_vectors(target->get_location_coordinates(), base->get_location_coordinates(), SUBTRACTION);  
+  normalize_vector(increment_vector, min_step);
+
+  //check special case when there's only one new node to add
+  bool is_singleton;
+  direction_vector_length <= 2*min_step ? is_singleton = true : is_singleton = false;
+  shared_ptr<vertex> parent = base;
+  
+  //adding new position for cur node
+  double* new_position = add_vectors(base->get_location_coordinates(), increment_vector, ADDITION);
+  shared_ptr<vertex> cur =  make_shared<vertex>(new_position, 0, probe_radius, get_current_frame(), true);
+
+  //case when no node is added is already resolved and adding the first child is nonstandard operation happening in every other relevant case
+  base->set_child_pointer(cur);
+  
+  //singleton case
+  if(is_singleton){
+    target->set_parent_pointer(cur);
+    add_interpolated_node(path, base, cur, target);
+    delete [] new_position;
+    return;
+  }
+
+  //initiating the cur's child vertex, so pointer to it can be added in current loop cycle
+  double* new_position_child = add_vectors(new_position, increment_vector, ADDITION);
+  shared_ptr<vertex> child =  make_shared<vertex>(new_position_child, 0, probe_radius, get_current_frame(), true);
+  delete [] new_position_child;
+  delete [] new_position;
+
+
+  //while the child's distance to target node is longer than min_step
+  int counter = 0;
+ // print_vector(increment_vector);
+  while(compute_metric_eucleidean(child->get_location_coordinates(), target->get_location_coordinates()) > min_step){
+
+   //   print_vector(child->get_location_coordinates());
+   //   print_vector(target->get_location_coordinates());
+      add_interpolated_node(path, parent, cur, child);
+
+      parent = cur;
+      cur = child;
+      //position of new child node
+      new_position_child = add_vectors(cur->get_location_coordinates(), increment_vector, ADDITION);
+      child = make_shared<vertex>(new_position_child, 0, probe_radius, get_current_frame(), true);
+      //position is now copied in child vertex
+      delete [] new_position_child;
+  }
+  //final connection
+  add_interpolated_node(path, parent, cur, child);
+  add_interpolated_node(path, cur, child, target);
+  target->set_parent_pointer(child);
+  if(!test_path_noncolliding_static(path)){
+//    cout << "INTERPOLATED PATH COLLIDING " << endl;
+//    exit(0);
+  }
+//  cout << "NEW PATH SIZE " << path->get_vertices().size() << endl;
+//  cout << "STUFF " << child->get_index() << " " << target->get_index() << endl; 
+}
+
+void interpolate_smoothed_segments(shared_ptr<Path> path){
+  if(path->get_size() < 2){
+//    cout << "TEST ERROR: interpolate_smoothed_segments: path has less than two nodes! " << endl;
+    return;
+  }
+
+  shared_ptr<vertex> base = path->get_beginning_node();
+  shared_ptr<vertex> target;
+
+//  cout << "ENDPOINT " << path->get_endpoint_index() << endl;
+  while(base->get_index() != path->get_endpoint_index()){
+    target = base->get_child_pointer().lock();
+    interpolate_nodes(path, base, target);
+    base = target;
+
+//    cout << "BASE " << base->get_index() << endl;
+//    cout << "ENDPOINT NOW " << path->get_endpoint_index() << endl;
+  }
+}
+
+
+
+void smooth_tunnel(shared_ptr<Path> path){
+  shared_ptr<vertex> cur = path->get_beginning_node();
+  
+  int counter = 0;
+  while(cur->get_index() != path->get_endpoint_index()){
+    if(cur->is_in_some_valid_path()){
+      cur = cur->get_child_pointer().lock();
+      continue;
+    }
+    shared_ptr<vertex> cur_inner = path->get_beginning_node();
+    bool is_inner_first = true;
+    while(cur_inner != NULL){
+//      cout << endl << "cur " << cur->get_index() << endl;
+//      cout << "cur_inner " << cur_inner->get_index() << endl;
+//      cout << "distance " << compute_metric_eucleidean(cur->get_location_coordinates(), cur_inner->get_location_coordinates()) << endl;
+
+      if(is_inner_first){
+        if(cur->get_index() == cur_inner->get_index()){
+          is_inner_first = false;
+          cur_inner = cur_inner->get_child_pointer().lock();
+          continue;
+        } else {
+          delete_nodes_inbetween(path, cur_inner, cur);
+        }
+      }
+      else {
+      delete_nodes_inbetween(path, cur, cur_inner);
+      }
+      cur_inner = cur_inner->get_child_pointer_null_permisive().lock();
+    }
+    
+    cur = cur->get_child_pointer().lock();
+  }
+
+  interpolate_smoothed_segments(path);
   
 }
 
-Function OptimizationPhaseOneAlgorithmOne(initialTunnel)
-foreach i ∈ { 0, 1, ..., initialPath.size () − 1 } do
-foreach j ∈ { 0, 1, ..., initialPath.size () − 1 } do
-if collisionFree ( initialPath [ i ] , initialPath [ j ]) then
-initialPath ← deleteNodes ( initialPath, i, j ) ;
-end
-end
-end
-return initialPath;
 
 void center_tunnel(shared_ptr<Path> path){
   std::map<int, shared_ptr<vertex>>::iterator iterator;
@@ -317,6 +533,7 @@ void center_tunnel(shared_ptr<Path> path){
   int index = -1;
  
   std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
+  // cout << "size " << path_vertices.size() << endl;
   //cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
   for(iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
     //start node is not centered
@@ -357,7 +574,7 @@ void center_tunnel(shared_ptr<Path> path){
 
     double* direction_vector = add_vectors(cur_node->get_location_coordinates(), prev_node->get_location_coordinates(), SUBTRACTION);
     
-    center_node(cur_node, prev_node, child_node, direction_vector, 1, true, true, false);
+    center_node(cur_node, prev_node, child_node, direction_vector, 0.5, true, true, false);
   
     delete [] direction_vector;
     
@@ -388,10 +605,49 @@ void center_tunnel(shared_ptr<Path> path){
   path->set_endpoint_index(index); 
 }
 
+void center_tunnel_without_erasing(shared_ptr<Path> path){
+
+  if(path->get_size() < 2) return;
+  shared_ptr<vertex> cur = path->get_beginning_node()->get_child_pointer().lock();
+  shared_ptr<vertex> parent = NULL;
+  shared_ptr<vertex> child = NULL;
+
+  //cout << "size " << path_vertices.size() << endl;
+  //cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
+  while(true){  
+    /*
+    With reused tree, that already centered node is inside some previous trajectory. Therefore instead of costy centering procedure it can just be copied from that path.
+    exists_in_path() method returns -1 if the node is new. else it returns index into path in paths vector.
+    Important - node must be valide in the same frame as current node, because molecular positions are different in every frame!
+    Duplicated paths are deleted, therefore we must be sure to not index into them, this is achieved by calling the "labeling" function, which points the nodes in main data structures
+    into valid paths, when the path is added into main paths vector 
+    */
+
+    bool is_endpoint = false;
+    parent = cur->get_parent_pointer().lock();
+    if(cur->get_index() == path->get_endpoint_index()) is_endpoint = true;
+    if(!is_endpoint) child = cur->get_child_pointer().lock();
+
+    double* direction_vector = add_vectors(cur->get_location_coordinates(), parent->get_location_coordinates(), SUBTRACTION);
+  
+    //if(!is_endpoint) cout << "child_node " << child->get_index() << endl;
+    center_node(cur, parent, child, direction_vector, 1, !is_endpoint, true, false);
+    delete [] direction_vector;
+    if(is_endpoint){
+      break;
+    }
+
+    cur = child;
+  }
+}
+
+
+
 int path_optimization(shared_ptr<Path> path){
   //path = smoothing(path);
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
  
+  //smooth_tunnel(path);
   smoothing(path);
   center_tunnel(path);
   cut_tunnel(path);
@@ -403,5 +659,36 @@ int path_optimization(shared_ptr<Path> path){
   return 1;
   //cut_tunnel(path);
   //path = center_tunnel(path);
+}
+
+
+double find_tunnel_length_and_bottleneck(shared_ptr<Path> path){
+  shared_ptr<vertex> prev = path->get_beginning_node();
+  shared_ptr<vertex> cur = prev->get_child_pointer().lock();
+  double length = 0;
+  double bottleneck = DBL_MAX;
+
+  while(cur != NULL){
+    length += compute_metric_eucleidean(prev->get_location_coordinates(), cur->get_location_coordinates());
+    if(cur->get_radius() < bottleneck){
+      bottleneck = cur->get_radius();
+    }
+    prev = cur;
+    cur = cur->get_child_pointer_null_permisive().lock(); 
+  }
+}
+
+void path_optimization_postprocessing(shared_ptr<Path> path){
+  //smooth_tunnel(path);
+  //center_tunnel_without_erasing(path);
+  double success = 100;
+  do {
+    cout << "path_size pre" << path->get_size() << endl; 
+    success = smoothing_vol2(path);
+    cout << "success " << success << endl;
+    cout << "path_size post" << path->get_size() << endl; 
+  }
+  while(success > SMOOTHING_SUCCESS_THRESHOLD);
+
 }
 

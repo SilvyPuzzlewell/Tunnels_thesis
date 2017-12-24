@@ -127,6 +127,12 @@ double* copy_array_to_coordinate_pointer(array<double, 3> array){
   return coordinates;
 }
 
+double* create_direction_vector(shared_ptr<vertex> base, shared_ptr<vertex> target, double length){
+  double* direction_vector = add_vectors(target->get_location_coordinates(), base->get_location_coordinates(), SUBTRACTION);  
+  normalize_vector(direction_vector, length);
+  return direction_vector;
+}
+
 bool double_equals(double a, double b)
 {
     double epsilon = 0.00001;

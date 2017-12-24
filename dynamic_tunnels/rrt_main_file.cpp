@@ -846,6 +846,11 @@ int main(int argc, char *argv[])
   if(are_duplicated_pdbs_created){
     paths.insert(paths.end(), duplicated_paths.begin(), duplicated_paths.end());
   }
+
+  for(int i = 0; i < paths.size(); i++){
+    path_optimization_postprocessing(paths[i]);
+  }
+
   if(found){
     string directory = "./found_tunnels/tunnels";
     if(argc > 1){

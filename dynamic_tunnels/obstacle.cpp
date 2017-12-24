@@ -101,6 +101,10 @@ int vertex::is_in_path(){
 	return exists_in_path;
 }
 
+
+bool vertex::is_in_some_valid_path(){
+	return this->exists_in_path == -1 ? false :  true;
+}
 void vertex::set_in_path(int new_index){
 	this->exists_in_path = new_index;
 }

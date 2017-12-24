@@ -8,6 +8,7 @@
 double* center_node(shared_ptr<vertex> centered_node, 
 	shared_ptr<vertex> previous_node, shared_ptr<vertex> next_node, double* coordinate_vector, double increment, bool are_neighbors_centered, bool rewrite_node, bool return_node_info);
 int path_optimization(shared_ptr<Path> path);
+void path_optimization_postprocessing(shared_ptr<Path> path);
 
 
 #endif

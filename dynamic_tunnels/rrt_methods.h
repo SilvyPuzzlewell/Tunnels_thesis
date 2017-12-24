@@ -16,3 +16,4 @@ void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debu
 void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only_valid_in_curframe);
 int add_to_tree(double* loc_coord, int tree_index, MPNN::MultiANN<double>* kdTree);
 void build_tree(int is_global);
+bool test_path_noncolliding_static(shared_ptr<Path> tested_path);

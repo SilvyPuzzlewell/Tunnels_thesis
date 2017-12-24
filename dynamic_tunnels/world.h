@@ -74,6 +74,7 @@ class vertex {
   void set_coordinates(double* location_coordinates_raw);
   void add_valid_frame(int frame);
   int is_in_path();
+  bool is_in_some_valid_path();
   void set_in_path(int index);
   bool is_valid_in_frame(int frame);
 

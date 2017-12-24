@@ -284,5 +284,16 @@ int add_to_tree(double* loc_coord, int tree_index, MPNN::MultiANN<double>* kdTre
     //std::cout << annpt[0] << " " << annpt[1] << " " << annpt[2] << endl;
     kdTree->AddPoint(annpt,tree_index); 
     MPNN::annDeallocPt(annpt);
+}
+
+bool test_path_noncolliding_static(shared_ptr<Path> tested_path){
+  std::map<int, shared_ptr<vertex>> map = tested_path->get_vertices();
+
+  for(std::map<int, shared_ptr<vertex>>::iterator iterator = map.begin(); iterator != map.end(); iterator++){
+    if(is_in_obstacle(iterator->second->get_location_coordinates(), iterator->second->get_radius(), CHECK_WITH_BLOCKING_SPHERES)){
+      return false;
+    }
+  }
+  return true;
 } 
  

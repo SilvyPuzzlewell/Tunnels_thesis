@@ -14,7 +14,7 @@ int N = 50; //default number of intervals
 double INTERVAL_RATIO_CONSTANT = 15; //into how much intervals are the paths divided, based on maximum number of tunnel atoms in current run, example for shortest path with 1000 atoms, run will be divided into 100 intervalsw with value 10 
 double Z_start_radius = 1;
 double Z_end_radius = 1;
-double MIN_VALID_INTERTUNNEL_DISTANCE = 15;
+double MIN_VALID_INTERTUNNEL_DISTANCE = 3;
 
 
 bool DEBUG_ENABLED = false;
@@ -342,7 +342,8 @@ int is_tunnel_duplicated(shared_ptr<Path> checked_path, std::vector<shared_ptr<P
 	for(int i = 0; i < existing_paths.size(); i++){                        
 		double distance = compute_intertunnel_distance_by_N_representations(existing_paths[i], checked_path);
 		std::cout << "distance " << distance << std::endl;
-		if(distance < MIN_VALID_INTERTUNNEL_DISTANCE){
+		std::cout << "final N " << N << std::endl;
+		if(distance < MIN_VALID_INTERTUNNEL_DISTANCE * (N / 2)){
 			return i;
 		}
 	}
