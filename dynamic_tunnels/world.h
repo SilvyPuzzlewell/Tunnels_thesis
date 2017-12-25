@@ -29,6 +29,8 @@ extern int iterations;
 extern double min_distance_to_goal;
 extern bool use_caver_dupcheck;
 extern double inside_sampling_bias;
+extern double MIN_VALID_INTERTUNNEL_DISTANCE;
+extern bool RESETED_TREE_MODE;
 
 //variables spend for recording time in various methods
 extern double nearest_neighbor_search_time;
@@ -137,12 +139,13 @@ class Path: public Tree {
  private:
   vector<int> valid_frames;
   //---for fast duplication checks
-  vector<double*> N_representation;
+  
   vector<int> N_counts;
   int beginning_index;
   int endpoint_index;
   //---
  public:
+  vector<double*> N_representation;
   shared_ptr<vertex> operator[](std::size_t idx); 
 
   Path(int beginning_index, int endpoint_index, int current_frame);
@@ -157,6 +160,7 @@ class Path: public Tree {
   double* get_N_point(int index);
   void reset_N_representation();
   void erase_from_index(int index);
+  bool is_node_endpoint(shared_ptr<vertex> node);
 
   int get_child_index(int index);
   int get_endpoint_index();
@@ -216,6 +220,7 @@ extern const int BOTH;
 
 extern int tree_index;
 extern const int dimension; //kd tree dimension
+extern bool is_local_tree_initialized;
 
 
 

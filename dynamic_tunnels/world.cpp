@@ -33,9 +33,11 @@ AABBTreeSphere* blocking_spheres_tree;
 vector<shared_ptr<Ball>> blocking_spheres;
 vector<shared_ptr<Ball>> protein_balls;
 
-bool TESTING_ENABLED = true;
+bool TESTING_ENABLED = false;
 
 double REPEATED_RUN_ITERATIONS_COEFFICIENT = 0.5;
+
+
 int world_size_x = 100; int world_size_y = 100; int world_size_z = 100; int world_size_x_shift = 0; int world_size_y_shift = 0; int world_size_z_shift = 0;
 
 
@@ -53,6 +55,8 @@ double probe_radius; //radius of sphere protein probe
 double test_sphere_radius; // radius of sphere used to find if point is inside protein structure
 bool use_caver_dupcheck;
 double inside_sampling_bias;
+double MIN_VALID_INTERTUNNEL_DISTANCE;
+bool RESETED_TREE_MODE;
 //---- variables for recording time spent in various methods
 double nearest_neighbor_search_time = 0;
 double tunnel_optimization_time = 0;
@@ -81,6 +85,7 @@ const int dimension = 3;
 
 //---
 bool is_blocking_spheres_tree_initialized = false;
+bool is_local_tree_initialized;
 
 
 //---- global variables used in whole program
@@ -198,6 +203,28 @@ void load_parameters(string config_filename){
     inside_sampling_bias = 3;
   }
 
+  file >> dummy; file >> value;
+  if(!(file.eof())){
+    MIN_VALID_INTERTUNNEL_DISTANCE = stod(value, NULL);
+    
+  } else {
+    MIN_VALID_INTERTUNNEL_DISTANCE = 10;
+  }
+  cout << "min_valid_intertunnel_distance: " << MIN_VALID_INTERTUNNEL_DISTANCE << endl;
+
+  file >> dummy; file >> value;
+  if(!(file.eof())){
+    double RESETED_TREE_MODE_code = stoi(value, NULL);
+    if(RESETED_TREE_MODE_code == 1){
+      RESETED_TREE_MODE = true;
+    } else {
+      RESETED_TREE_MODE = false;
+    }
+  } else {
+    RESETED_TREE_MODE = false;
+  }
+  cout << "reseted tree: " << RESETED_TREE_MODE << endl;
+
 
  
 /*
@@ -303,7 +330,7 @@ void rebuild_protein_structure(double* new_sphere_coords, bool add_sphere, strin
   protein_tree = build_collision_structure(atoms, false);
 }
 void rebuild_blocking_spheres_structure(double* obstacle_loccoord, double radius){
-  cout << "BLOCKING_SPHERES_STRUCTURE_SIZE " << blocking_spheres.size() << endl;
+  //cout << "BLOCKING_SPHERES_STRUCTURE_SIZE " << blocking_spheres.size() << endl;
   if(blocking_spheres.size() != 0) {
     delete_blocking_spheres(false);
   }
@@ -311,7 +338,7 @@ void rebuild_blocking_spheres_structure(double* obstacle_loccoord, double radius
   blocking_spheres = add_ball(obstacle_loccoord[0], obstacle_loccoord[1], obstacle_loccoord[2], radius, blocking_spheres);
   
   blocking_spheres_tree = build_collision_structure(blocking_spheres, true);
-  cout << "Size of the blocking spheres tree AFTER assignation " <<get_blocking_spheres_tree_size() << endl;
+  //cout << "Size of the blocking spheres tree AFTER assignation " <<get_blocking_spheres_tree_size() << endl;
   is_blocking_spheres_tree_initialized = true;
 
   
@@ -370,8 +397,8 @@ void delete_blocking_spheres(bool is_vector_cleared){
     cout << "deleting NULL tree! " << endl;
     return;
   }
-  cout << "is_vector_cleared " << is_vector_cleared << endl;
-  cout << "Size of the blocking spheres tree BEFORE delet " <<get_blocking_spheres_tree_size() << endl;
+  //cout << "is_vector_cleared " << is_vector_cleared << endl;
+  //cout << "Size of the blocking spheres tree BEFORE delet " <<get_blocking_spheres_tree_size() << endl;
   if(is_blocking_spheres_tree_initialized) delete blocking_spheres_tree;
   is_blocking_spheres_tree_initialized = false;
 

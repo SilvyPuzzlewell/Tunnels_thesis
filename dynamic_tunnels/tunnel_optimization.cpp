@@ -18,6 +18,7 @@ double MAXIMUM_SMOOTHING_DISTANCE = 0.8;
 
 
 
+
 /*
 Function which returns node approximately centered around the tunnel path. It can be used in two modes, either it centers node without respect to neighboring nodes, which leads to jagged path
 but is more accurate or it takes into account two neighboring nodes and moving them in the same direction as the main node aimed for centering, which results in smoother path but more approximate
@@ -59,12 +60,13 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
   } 
   
   //maximum radius in default position, used in first iteration to find larger one 
+  //cout << "first " << endl;
   double cur_radius = approximate_radius(node_coordinates, centered_node->get_radius(), 0.01, 0.1);
   //for comparison
   double check_radius = cur_radius; 
   double default_radius = centered_node->get_radius(); //reference radius, important because radius adjusting function expects non-colliding molecule, if
   //radius used to store previous maximum value to check the one found in current iteration against 
-  double prev_radius = default_radius;
+  double prev_radius = cur_radius;
 
   /*  //sanity check
   cout << "--dot products--" << endl;
@@ -108,11 +110,12 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
       double* shifted_coordinates = add_vectors(shift_vector, node_coordinates, ADDITION);
 
       //... and maximum radius of ball in that placement is found
+      //cout << "second" << endl;
       cur_radius = approximate_radius(shifted_coordinates, default_radius, 0.01, 0.1);
      
       //maximum radius in this position is checked subtracted from maximum radius found in previous iteration and checked against the maximum increase found in current iteration, which starts at zero,
       //therefore the new maximum radius must be greater than the previous one
-      if((cur_radius - prev_radius) > max_increase && !is_in_obstacle(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) {
+      if((cur_radius - check_radius) > max_increase && !is_in_obstacle(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) {
         
 
         //--- can be buggy, check later
@@ -128,7 +131,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
           if((next_node == NULL && !is_in_obstacle(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES))||(next_node != NULL && !is_in_obstacle(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES) && !is_in_obstacle(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES))){
              //test was succesfull, node can be moved
              //new radius is assigned
-             max_increase = cur_radius - prev_radius;
+             max_increase = cur_radius - check_radius;
              prev_radius = cur_radius;
              delete [] node_coordinates;
              node_coordinates = copy_vector(shifted_coordinates);
@@ -146,7 +149,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
 
         //---can be buggy. check later---end
         else {
-          max_increase = cur_radius - prev_radius;
+          max_increase = cur_radius - check_radius;
           prev_radius = cur_radius;
           delete [] node_coordinates;
           node_coordinates = copy_vector(shifted_coordinates); 
@@ -168,7 +171,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
   delete [] perpendicular_vector;
   if(rewrite_node){
   centered_node->set_coordinates(node_coordinates);
-  centered_node->set_radius(cur_radius);
+  centered_node->set_radius(ret_radius);
   }
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   centring_time += duration_cast<microseconds>( t2 - t1 ).count();
@@ -183,11 +186,19 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
 
   if(!return_node_info){ //this is because we don't always want to allocate new memory
     delete [] node_coordinates;
+    if(is_in_obstacle(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES)){
+      cout << "centered node colliding!" <<endl;
+      create_segfault();
+    }
     return NULL;
   } else {
     double* ret = new double[4];
     ret[0] = node_coordinates[0]; ret[1] = node_coordinates[1]; ret[2] = node_coordinates[2]; ret[3] = cur_radius;
-    delete [] node_coordinates; 
+    delete [] node_coordinates;
+    if(is_in_obstacle(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES)){
+      cout << "centered node colliding!" <<endl;
+      create_segfault();
+    } 
     return ret;   
   }
   //std::cout<< cur_radius << endl;
@@ -264,7 +275,7 @@ void cut_tunnel(shared_ptr<Path> path){
     //cout << "cut tunnel indices " << endpoint_index << " " << endpoint_parent_index << endl;
     //cout << "cut tunnel " << path_vertices[endpoint_index]->index << " " << path_vertices[endpoint_parent_index]->index << " " << local_priority_kdTree_coordinates[endpoint_index]->is_in_path()<< endl;
     double* direction_vector = add_vectors(path_vertices[endpoint_index]->get_location_coordinates(), path_vertices[endpoint_parent_index]->get_location_coordinates(), SUBTRACTION);
-    double* node_information = center_node(path_vertices[endpoint_index], NULL, NULL, direction_vector, test_sphere_radius / 1.5, false, false, true);
+    double* node_information = center_node(path_vertices[endpoint_index], NULL, NULL, direction_vector, test_sphere_radius / 2, false, false, true);
     if(node_information [3] > test_sphere_radius){      
       vertex_indices_to_be_deleted.push_back(endpoint_index);
     } 
@@ -277,8 +288,8 @@ void cut_tunnel(shared_ptr<Path> path){
 
   }
 
-  cout << "path endpoint index " << path->get_endpoint_index() <<endl;
-  cout << "deleted node index " << vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1] <<endl;
+  //cout << "path endpoint index " << path->get_endpoint_index() <<endl;
+  //cout << "deleted node index " << vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1] <<endl;
   int deleted_index = -1;
   if(path->get_endpoint_index() != vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]){ //endpoint doesn't have child, would crash program
     deleted_index = path->get_child_index(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
@@ -527,17 +538,19 @@ void smooth_tunnel(shared_ptr<Path> path){
 
 
 void center_tunnel(shared_ptr<Path> path){
-  std::map<int, shared_ptr<vertex>>::iterator iterator;
+  //std::map<int, shared_ptr<vertex>>::iterator iterator;
 
   int counter = 0;
   int index = -1;
  
-  std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
+  //std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
   // cout << "size " << path_vertices.size() << endl;
   //cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
-  for(iterator = path_vertices.begin(); iterator != path_vertices.end(); iterator++){
-    //start node is not centered
-    if(counter == 0){counter++;index = path_vertices[0]->get_child_index(); continue;}
+  if(path->get_size() < 2) return;
+
+  shared_ptr<vertex> cur_node = path->get_beginning_node()->get_child_pointer().lock();
+
+  while(true){
     
     /*
     With reused tree, that already centered node is inside some previous trajectory. Therefore instead of costy centering procedure it can just be copied from that path.
@@ -546,9 +559,7 @@ void center_tunnel(shared_ptr<Path> path){
     Duplicated paths are deleted, therefore we must be sure to not index into them, this is achieved by calling the "labeling" function, which points the nodes in main data structures
     into valid paths, when the path is added into main paths vector 
     */
-    shared_ptr<vertex> cur_node = path_vertices[index];
     bool is_local = cur_node->is_local();
-
     int exists_in_path = -1;
     if(is_local){
       exists_in_path = local_priority_kdTree_coordinates->get_node_pointer(cur_node->get_index())->is_in_path();
@@ -561,20 +572,40 @@ void center_tunnel(shared_ptr<Path> path){
       cur_node->set_coordinates(related_node->get_location_coordinates()); //copy identical nodes coordinates to current;
       cur_node->set_radius(related_node->get_radius());
 
+      //cout << cur_node->get_index() << endl;
+
       if(cur_node->get_children_count() > 0){
-        index = cur_node->get_child_index();
+        if(path->is_node_endpoint(cur_node)){
+          return;
+        }
+        cur_node = cur_node->get_child_pointer_null_permisive().lock();
+        if(cur_node == NULL){
+          cout << "TEST ERROR, center tunnel returns empty node:571 " <<endl;
+          create_segfault();
+        }
       }
       continue;
     }
 
 
-    shared_ptr<vertex> prev_node = path_vertices[cur_node->get_parent_index()];
-    //cout << "center tunnel: counter " << counter << " cur_node " << cur_node->get_index() << endl;
-    shared_ptr<vertex> child_node = path_vertices[path->get_child_index(cur_node->get_index())];
+    shared_ptr<vertex> parent_node = cur_node->get_parent_pointer().lock();
+    shared_ptr<vertex> child_node = NULL;
+    if(!path->is_node_endpoint(cur_node)){
+      shared_ptr<vertex> child_node = cur_node->get_child_pointer_null_permisive().lock();
+      if(child_node == NULL){
+        cout << "TEST ERROR, center tunnel returns empty node " <<endl;
+        create_segfault();
+      }
+    }
 
-    double* direction_vector = add_vectors(cur_node->get_location_coordinates(), prev_node->get_location_coordinates(), SUBTRACTION);
+    double* direction_vector = add_vectors(cur_node->get_location_coordinates(), parent_node->get_location_coordinates(), SUBTRACTION);
     
-    center_node(cur_node, prev_node, child_node, direction_vector, 0.5, true, true, false);
+    if(child_node != NULL){
+      center_node(cur_node, parent_node, child_node, direction_vector, 0.5, true, true, false);
+
+    } else {
+      center_node(cur_node, NULL , NULL, direction_vector, 0.5, false, true, false);
+    }
   
     delete [] direction_vector;
     
@@ -585,24 +616,32 @@ void center_tunnel(shared_ptr<Path> path){
     and the kd trees are rebuilded. In first frame, it's possible to only care about local structures, which speeds up static detection.
     */
 
+    if(path->is_node_endpoint(cur_node)){
+      break;
+    }
 
-
-    if(path_vertices[index]->get_radius() > test_sphere_radius){
-      int child_index = path->get_child_index(index);    
+    if(cur_node->get_radius() > test_sphere_radius){
+      int child_index = cur_node->get_child_pointer().lock()->get_index();    
       if(child_index == -1){
           cerr << "your start position already lies in empty space!" << endl;
-          exit(0);      
+          return;      
       }
       cut_subtree_in_main_tree(path->get_node_pointer(child_index), false); 
-      path->erase_from_index(child_index); 
+      path->erase_from_index(child_index);
+      path->set_endpoint_index(cur_node->get_index()); 
       break;}; //to_do
+
+    
     if(cur_node->get_children_count() > 0){
-      index = cur_node->get_child_index(0);
+      cur_node = cur_node->get_child_pointer().lock();
+    } else {
+      cout << "TEST ERROR, SOME SHIT HAPPEND " <<endl;
+      create_segfault();
     }
-    counter++;
+
   }
   
-  path->set_endpoint_index(index); 
+   
 }
 
 void center_tunnel_without_erasing(shared_ptr<Path> path){
@@ -648,9 +687,28 @@ int path_optimization(shared_ptr<Path> path){
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
  
   //smooth_tunnel(path);
-  smoothing(path);
+  if(!test_path_noncolliding_static(path)){
+      cout << "path colliding opt bef processing!" <<endl;
+      create_segfault();
+    }
+
+  //smoothing(path);
+  if(!test_path_noncolliding_static(path)){
+      cout << "path colliding opt_after_smth processing!" <<endl;
+      create_segfault();
+    }
   center_tunnel(path);
+  if(!test_path_noncolliding_static(path)){
+      cout << "path colliding opt_after_centr processing!" <<endl;
+      create_segfault();
+    }
   cut_tunnel(path);
+
+  if(!test_path_noncolliding_static(path)){
+      cout << "path colliding opt_post processing!" <<endl;
+      create_segfault();
+    }
+  
   
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
@@ -678,15 +736,17 @@ double find_tunnel_length_and_bottleneck(shared_ptr<Path> path){
   }
 }
 
+
+
 void path_optimization_postprocessing(shared_ptr<Path> path){
   //smooth_tunnel(path);
   //center_tunnel_without_erasing(path);
   double success = 100;
   do {
-    cout << "path_size pre" << path->get_size() << endl; 
+    //cout << "path_size pre" << path->get_size() << endl; 
     success = smoothing_vol2(path);
-    cout << "success " << success << endl;
-    cout << "path_size post" << path->get_size() << endl; 
+    //cout << "success " << success << endl;
+    //cout << "path_size post" << path->get_size() << endl; 
   }
   while(success > SMOOTHING_SUCCESS_THRESHOLD);
 

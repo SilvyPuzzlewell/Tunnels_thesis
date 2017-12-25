@@ -60,7 +60,7 @@ vector <bool> path_found_in_frame;
 
 double maximum_increase = 1.5; //aximum increase in blocking sphere size due to many duplicates, in percents (1.5 = 150 percent bigger sphere)
 bool step_success_flag;        //used to determine succesful add to local tree, if fails global is tryied or if global doesn't exist, iteration fail
-bool is_local_tree_initialized;
+
 bool LOCALIZED_MODE = false; 
 //kept for debugging purposes---
 bool are_duplicated_pdbs_created = false;
@@ -154,9 +154,9 @@ shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){
     int nearest_frame = find_valid_frame(cur, child_pointer);
     
     if(nearest_frame > child_pointer->get_frame_index()){
-      cout << "backtrack_frame cur " << nearest_frame << endl;
-      cout << "backtrack_frame prev " << child_pointer->get_frame_index() << endl;
-      cout << "backtrack fail, time travel not allowed!" << endl;
+      //cout << "backtrack_frame cur " << nearest_frame << endl;
+      //cout << "backtrack_frame prev " << child_pointer->get_frame_index() << endl;
+      //cout << "backtrack fail, time travel not allowed!" << endl;
     }
     if(nearest_frame == -1){            //there is no previous frame, therefore you would have time travel to past to go through this path
       cerr << "found null frame in path " << endl; //SHOULDN'T HAPPEN!
@@ -360,7 +360,7 @@ int is_duplicated(shared_ptr<Path> tested__path){
       duplication_check_time += duration_cast<microseconds>( t2 - t1 ).count();
 
       num_of_duplicates++;
-      cout << "TRIAL -- basic dup check 1" << endl << endl; 
+      //cout << "TRIAL -- basic dup check 1" << endl << endl; 
       return i;
     }
   i++;
@@ -368,7 +368,7 @@ int is_duplicated(shared_ptr<Path> tested__path){
 //  cout << "not duplicates " << endl;
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   duplication_check_time += duration_cast<microseconds>( t2 - t1 ).count();
-  cout << "TRIAL -- basic dup check 0" << endl << endl; 
+  //cout << "TRIAL -- basic dup check 0" << endl << endl; 
   return -1;
 } 
 
@@ -588,6 +588,22 @@ void add_to_path_count(int path){
     path_found_in_frame[path] = true;
   }
 }
+
+void restart(){
+  delete local_priority_kdTree;
+  delete local_priority_kdTree_coordinates;
+  build_tree(LOCAL);
+  local_priority_kdTree_coordinates = new Tree();
+  double location_coordinates[3] = {qix, qiy, qiz};
+  shared_ptr<vertex> start = make_shared<vertex>(location_coordinates, 0, probe_radius, get_current_frame(), true);
+  local_priority_kdTree_coordinates->add_node(start);
+  
+  tree_index = 0;  //use as a static variable in tree::add_node;
+  add_to_tree(start->get_location_coordinates(), tree_index, local_priority_kdTree);
+  tree_index++; 
+  is_local_tree_initialized = true;
+}
+
 void backtrack_process_path(shared_ptr<vertex> new_vertex ) {    
 		found = true;
     //new vertex is the last node added to terminated path
@@ -628,13 +644,13 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
         duplicated_paths.push_back(path);
         add_to_path_count(is_duplicate);
         duplicate_count[is_duplicate] += 1;
-        cout << paths_count[is_duplicate] << endl;
+        //cout << paths_count[is_duplicate] << endl;
         //exit(0);
         add_sphere = true;
       }
       else {
         add_to_path_count(is_duplicate);
-        cout << paths_count[is_duplicate] << endl;
+        //cout << paths_count[is_duplicate] << endl;
         duplicate_count[is_duplicate] += 1;
         add_sphere = true;
       }
@@ -648,6 +664,10 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
       else {
         add_blocking_sphere(location_coordinates, (maximum_increase) * blocking_sphere_radius);
       }
+    }
+
+    if(RESETED_TREE_MODE){
+      restart();
     }   
 	}
 
@@ -709,7 +729,7 @@ MPNN::MultiANN<double>* new_frame_initalisation(){
       add_blocking_sphere((*iterator)->get_node_coordinates((*iterator)->get_endpoint_index()), (*iterator)->get_node_pointer((*iterator)->get_endpoint_index())->get_radius()); //to:do save in vector instead and rebuild it only once!, lazy and tired now
       add_to_path_count(i - 1);
     } else {
-      cout << "path " << i << " is invalid in frame " << get_current_frame() << endl;
+      //cout << "path " << i << " is invalid in frame " << get_current_frame() << endl;
     }
     i++;
   }
@@ -848,7 +868,15 @@ int main(int argc, char *argv[])
   }
 
   for(int i = 0; i < paths.size(); i++){
+    if(!test_path_noncolliding_static(paths[i])){
+      cout << "path colliding before processing!" <<endl;
+      create_segfault();
+    }
     path_optimization_postprocessing(paths[i]);
+    if(!test_path_noncolliding_static(paths[i])){
+      cout << "path colliding before processing!" <<endl;
+      create_segfault();
+    }
   }
 
   if(found){
@@ -889,6 +917,7 @@ int main(int argc, char *argv[])
     sout << "tunnel "<<  i + 1 << " found in " << ((double)paths_count[i] / (double)get_current_frame())*100 << "% of tested frames" << endl;
   } 
 
+  //create_segfault();
   string data = sout.str();
 
   cout << data;
@@ -899,7 +928,7 @@ int main(int argc, char *argv[])
   outfile << data;
   outfile << endl;
   
- 
+
   return 0;
 }
 

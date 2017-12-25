@@ -14,7 +14,7 @@ int N = 50; //default number of intervals
 double INTERVAL_RATIO_CONSTANT = 15; //into how much intervals are the paths divided, based on maximum number of tunnel atoms in current run, example for shortest path with 1000 atoms, run will be divided into 100 intervalsw with value 10 
 double Z_start_radius = 1;
 double Z_end_radius = 1;
-double MIN_VALID_INTERTUNNEL_DISTANCE = 3;
+
 
 
 bool DEBUG_ENABLED = false;
@@ -302,9 +302,14 @@ void decide_N(std::vector<shared_ptr<Path>>& paths, shared_ptr<Path> path){
 }
 
 //obvious
-void recompute_N_representation(shared_ptr<Path> path){
+bool recompute_N_representation(shared_ptr<Path> path){
 	path->reset_N_representation();
-	create_N_representation(path);
+	bool ret =  create_N_representation(path);
+	//if(!ret){
+	//	cout << "FAILLLL" << endl;
+	//}
+	return ret;
+	
 }
 
 
@@ -313,39 +318,45 @@ void recompute_N_representation(shared_ptr<Path> path){
 void N_representation(std::vector<shared_ptr<Path>> existing_paths, shared_ptr<Path> checked_path){
 	int counter = 0;
 	bool was_succesful;
-	do {
-		was_succesful = create_N_representation(checked_path);
-		if(!was_succesful){
-			INTERVAL_RATIO_CONSTANT *= 1.2;
-			decide_N(existing_paths, checked_path);
-			if(existing_paths.size() > 0){
-				for(std::vector<shared_ptr<Path>>::iterator iterator = existing_paths.begin(); iterator != existing_paths.end(); iterator++){
-					recompute_N_representation(*iterator);
-				}
-			}
+	bool recompute = false;
+	was_succesful = create_N_representation(checked_path);
+	while(!was_succesful){
+		recompute = true;
+		INTERVAL_RATIO_CONSTANT *= 1.2;
+		decide_N(existing_paths, checked_path);			
+		was_succesful = recompute_N_representation(checked_path);
+	} 
+
+	if(recompute && existing_paths.size() > 0){
+		for(std::vector<shared_ptr<Path>>::iterator iterator = existing_paths.begin(); iterator != existing_paths.end(); iterator++){
+			recompute_N_representation(*iterator);
 		}
-		//sanity check
-		if(counter > 100){std::cerr << "recomputing N representation reached infinite loop!! "; exit(0);}
-	} while(!was_succesful);
+	}
 }
 
 int is_tunnel_duplicated(shared_ptr<Path> checked_path, std::vector<shared_ptr<Path>> existing_paths){
 	if(existing_paths.size() == 0){
 		decide_N(existing_paths, checked_path);
 		N_representation(existing_paths, checked_path);
-
+		cout << "N " << N << std::endl;
+		cout << "first " << checked_path->N_representation.size() << endl;
 		return -1;
 	}
 
 	N_representation(existing_paths, checked_path);
 
-	for(int i = 0; i < existing_paths.size(); i++){                        
+	cout << "N " << N << std::endl;
+	cout << "checked N repr " << checked_path->N_representation.size() << endl;
+	for(int i = 0; i < existing_paths.size(); i++){
+		cout << "checked against N repr " << existing_paths[i]->N_representation.size() << endl;                         
 		double distance = compute_intertunnel_distance_by_N_representations(existing_paths[i], checked_path);
-		std::cout << "distance " << distance << std::endl;
-		std::cout << "final N " << N << std::endl;
+		//std::cout << "distance " << distance << std::endl;
+		//std::cout << "final N " << N << std::endl;
 		if(distance < MIN_VALID_INTERTUNNEL_DISTANCE * (N / 2)){
+			cout << endl;
 			return i;
 		}
 	}
+	cout << endl; 
 	return -1;
 }

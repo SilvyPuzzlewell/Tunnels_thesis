@@ -2,6 +2,8 @@
 #include <iostream>
 #include <string>
 #include <memory>
+#include <signal.h>
+
 #include "support_methods.h"
 
 
@@ -137,4 +139,9 @@ bool double_equals(double a, double b)
 {
     double epsilon = 0.00001;
     return std::abs(a - b) < epsilon;
+}
+
+//This is actually useful in debugging!
+void create_segfault(){
+  raise(SIGSEGV);
 }

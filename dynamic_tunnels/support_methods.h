@@ -30,6 +30,8 @@ array<double, 3> copy_coordinate_pointer_to_array(double* pointer);
 double* copy_array_to_coordinate_pointer(array<double, 3> array);
 bool double_equals(double a, double b);
 double* create_direction_vector(shared_ptr<vertex> target, shared_ptr<vertex> base, double length);
+//This is actually useful in debugging!
+void create_segfault();
 
 
 #endif

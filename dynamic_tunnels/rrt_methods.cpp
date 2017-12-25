@@ -129,18 +129,28 @@ bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_bl
 double approximate_radius(double* coordinates, double default_radius, double precision, double default_approximation_step){
   double approximation_step = default_approximation_step;
   double cur_radius = default_radius + approximation_step;
+  double last_valid_radius = default_radius;
+  if(is_in_obstacle(coordinates, last_valid_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
+     return 0;
+  }
   while(approximation_step > precision && cur_radius < test_sphere_radius + 1){
-    bool hasCollided = is_in_obstacle(coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES);
+    double test_radius = cur_radius + approximation_step;
+    bool hasCollided = is_in_obstacle(coordinates, test_radius, DONT_CHECK_WITH_BLOCKING_SPHERES);
     if(!hasCollided){
-      cur_radius += approximation_step;
+      cur_radius = test_radius;
+      last_valid_radius = test_radius;
     }
     else{
-      cur_radius -= approximation_step;
       approximation_step = approximation_step / 2;
-      cur_radius += approximation_step;
+      cur_radius -= approximation_step;
+      
     }
   }
-  return cur_radius;
+  if(is_in_obstacle(coordinates, last_valid_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
+      cout << "approximated radius colliding!" <<endl;
+      create_segfault();
+    }
+  return last_valid_radius;
 }
 
  
@@ -218,12 +228,12 @@ void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debu
   if(local_priority_kdTree_coordinates->get_size() != local_tree_size)kdTree_rebuild_index += 2; 
   rebuild_kd_tree(true, kdTree_rebuild_index, true, true); 
 
-  cout << "tree rebuilt" << endl; 
+  //cout << "tree rebuilt" << endl; 
 }
 
 //Later I should research how to use generics here instead of two functions
 void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only_valid_in_curframe){
-  cout << "rebuild status " << status <<endl;
+  //cout << "rebuild status " << status <<endl;
   if(is_initialized){
     if(status == GLOBAL || status == BOTH) {delete global_kdTree;}
     if(status == LOCAL || status == BOTH) {delete local_priority_kdTree;}
@@ -241,7 +251,7 @@ void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only
   if(copy_stuff && (status == LOCAL || status == BOTH)){
 
     std::map<int, shared_ptr<vertex>> graph_points_loc = local_priority_kdTree_coordinates->get_vertices();
-    cout << "rebuild loc " << graph_points_loc.size() << endl;
+    //cout << "rebuild loc " << graph_points_loc.size() << endl;
     for (std::map<int, shared_ptr<vertex>>::iterator iterator = graph_points_loc.begin(); iterator != graph_points_loc.end(); iterator++){
       if(!only_valid_in_curframe){
         add_to_tree(iterator->second->get_location_coordinates(), iterator->second->get_index(), local_priority_kdTree);
@@ -252,7 +262,7 @@ void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only
         }
       } 
     }
-    cout << "comparison: kd tree " << local_priority_kdTree->size << " data struct " << graph_points_loc.size() << endl;  
+    //cout << "comparison: kd tree " << local_priority_kdTree->size << " data struct " << graph_points_loc.size() << endl;  
   }
 }
 
@@ -287,11 +297,15 @@ int add_to_tree(double* loc_coord, int tree_index, MPNN::MultiANN<double>* kdTre
 }
 
 bool test_path_noncolliding_static(shared_ptr<Path> tested_path){
-  std::map<int, shared_ptr<vertex>> map = tested_path->get_vertices();
-
-  for(std::map<int, shared_ptr<vertex>>::iterator iterator = map.begin(); iterator != map.end(); iterator++){
-    if(is_in_obstacle(iterator->second->get_location_coordinates(), iterator->second->get_radius(), CHECK_WITH_BLOCKING_SPHERES)){
-      return false;
+  if(TESTING_ENABLED){
+    std::map<int, shared_ptr<vertex>> map = tested_path->get_vertices();
+      //cout << "endpoint " << tested_path->get_endpoint_index() << endl;
+      //cout << "beginning " << tested_path->get_beginning_index() << endl;
+    for(std::map<int, shared_ptr<vertex>>::iterator iterator = map.begin(); iterator != map.end(); iterator++){
+      //cout << "cur " << iterator->second->get_index() << endl;
+      if(is_in_obstacle(iterator->second->get_location_coordinates(), iterator->second->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES)){
+        return false;
+      }
     }
   }
   return true;

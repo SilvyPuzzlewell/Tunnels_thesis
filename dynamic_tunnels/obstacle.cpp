@@ -195,7 +195,9 @@ weak_ptr<vertex> vertex::get_child_pointer(){
 		return children_pointers[0];
 	} else {
 		cerr << "vertex::get_child_pointer(): children pointers are empty" << endl;
-		exit(0);
+		create_segfault();
+		//return children_pointers[5];
+		
 	}
 
 }
@@ -298,6 +300,10 @@ Path::~Path(){
 
 void Path::add_valid_frame(int frame){
 	valid_frames.push_back(frame);
+}
+
+bool Path::is_node_endpoint(shared_ptr<vertex> node){
+	return node->get_index() == this->get_endpoint_index();
 }
 
 shared_ptr<vertex> Path::get_beginning_node(){
@@ -421,7 +427,7 @@ void Path::reset_N_representation(){
 double* Path::get_N_point(int index){
 	if(index >= N_representation.size()){
 		cerr << "fatal error, asked for higher N in checking duplications" << endl;
-		exit(0);
+		create_segfault();
 	} 
 	else {
 		return N_representation[index];
