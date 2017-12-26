@@ -235,7 +235,11 @@ bool create_N_representation(shared_ptr<Path> tunnel){
 	//divides the sum of node position vectors in intervals by their number, so that it represents the actual center of gravity it's their interval
 	while(index < N){
 		if(N_counts[index] == 0){
-			std::cout << "zero interval count!!" << std::endl;
+			//std::cout << "zero interval count!!" << std::endl;
+			delete_vector(N_representation);
+			//cout << "pre fail delet " << tunnel->N_representation.size() <<endl;
+			tunnel->reset_N_representation();
+			//cout << "post fail delet " << tunnel->N_representation.size() << endl;
 			return false;
 		}
 		divide_vector(N_representation[index], (double) N_counts[index]);
@@ -245,6 +249,8 @@ bool create_N_representation(shared_ptr<Path> tunnel){
 		index++;
 	}
 
+	delete_vector(N_representation);
+	//exit(0);
 	return true;
 }
 
@@ -283,12 +289,16 @@ bool recompute_N_representation(std::vector<shared_ptr<Path>> existing_paths, sh
 	if(try_without_changing_N){
 		path->reset_N_representation();
 		successful = create_N_representation(path);
+		//cout << "successful? " << successful << endl;
+		//cout << "size after creation " << path->N_representation.size() << endl;
 	} 
 	
 	while(!successful){
 		N_changed = true;
 		INTERVAL_RATIO_CONSTANT *= 1.1;
 		decide_N(existing_paths, path);
+		//cout << "size " << path->N_representation.size() << endl;
+		//cout << "new N inside " << N <<endl;
 		path->reset_N_representation();
 		successful = create_N_representation(path);
 	}
@@ -307,12 +317,16 @@ void N_representation(std::vector<shared_ptr<Path>> existing_paths, shared_ptr<P
 	//find working N for the new path
 	if(!create_N_representation(checked_path)){
 		recompute = true;
+		//cout << "should be zero! " << checked_path->N_representation.size() << endl;
+		//cout << "old N " << N << endl; 
 		recompute_N_representation(existing_paths, checked_path, false);
+		//cout << "new N " << N << endl; 
 	}
 
 	bool recompute_checked_path = false;
 	if(recompute && existing_paths.size() > 0){
 		for(int i = 0; i < existing_paths.size(); i++){
+		//	cout << "path no." << i << endl; 
 			if(recompute_checked_path){
 				recompute_N_representation(existing_paths, checked_path, false);
 				recompute_checked_path = false;
@@ -320,12 +334,12 @@ void N_representation(std::vector<shared_ptr<Path>> existing_paths, shared_ptr<P
 			//N changed, must start from beginning to keep sizes consistent
 			if(recompute_N_representation(existing_paths, existing_paths[i], true))
 			{
-//				cout << "RESTART!" << endl;
+				//cout << "RESTART!" << endl;
 				i = -1;
 				recompute_checked_path = true;
 				continue;
 			}
-//			cout << "new size " << existing_paths[i]->N_representation.size() << endl;
+		//	cout << "new size " << existing_paths[i]->N_representation.size() << endl;
 		}
 	}
 }
@@ -340,11 +354,10 @@ int is_tunnel_duplicated(shared_ptr<Path> checked_path, std::vector<shared_ptr<P
 	}
 
 	N_representation(existing_paths, checked_path);
-
-//	cout << "N " << N << std::endl;
-//	cout << "checked N repr " << checked_path->N_representation.size() << endl;
+	//cout << "N " << N << std::endl;
+	//cout << "checked N repr " << checked_path->N_representation.size() << endl;
 	for(int i = 0; i < existing_paths.size(); i++){
-//		cout << "checked against N repr " << existing_paths[i]->N_representation.size() << endl;                         
+	//	cout << "checked against N repr " << existing_paths[i]->N_representation.size() << endl;                         
 		double distance = compute_intertunnel_distance_by_N_representations(existing_paths[i], checked_path);
 		//std::cout << "distance " << distance << std::endl;
 		//std::cout << "final N " << N << std::endl;

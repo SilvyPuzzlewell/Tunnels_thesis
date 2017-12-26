@@ -289,12 +289,7 @@ void print_ownership(std::map<int, shared_ptr<vertex>> map, string message){
 
 Path::~Path(){
 
-	while(N_representation.size() != 0){
-		double* deleted_ptr = N_representation.back();
-		delete [] deleted_ptr;
-		N_representation.pop_back();
-	}
-	
+	reset_N_representation();
 }
 
 
@@ -411,17 +406,14 @@ void Path::erase_node_with_reconnecting(int index){
 }
 
 
-void Path::add_N_point(double* N_point){ //added paths are never supposed to be deleted and N_points are limited only to them, hence no need for copying	
-	N_representation.push_back(N_point);	
+void Path::add_N_point(double* N_point){ 	
+	N_representation.push_back(copy_vector(N_point));	
 }
 
 
 void Path::reset_N_representation(){
-	while(N_representation.size() != 0){
-		double* deleted_ptr = N_representation.back();
-		delete [] deleted_ptr;
-		N_representation.pop_back();
-	} 
+	delete_vector(this->N_representation);
+	N_representation.clear();
 }
 
 double* Path::get_N_point(int index){
@@ -449,6 +441,28 @@ void Path::erase_from_index(int index){
 		}
 	}
 	erase_node_with_reconnecting(index);
+}
+
+void Path::print_path(){
+	shared_ptr<vertex> cur = this->get_beginning_node();
+	shared_ptr<vertex> next = cur->get_child_pointer().lock();
+	while(true){
+		cout << "index " << cur->get_index() << endl;
+		cout << "coordinates" << endl;
+		print_vector(cur->get_location_coordinates());
+		cout << "distance to next " << compute_metric_eucleidean(cur->get_location_coordinates(), next->get_location_coordinates()) << endl;
+
+		if(next->get_index() == endpoint_index){
+			cout << "endpoint " << endl;
+			cout << "index " << next->get_index() << endl;
+			cout << "coordinates" << endl;
+			print_vector(next->get_location_coordinates());
+			break;
+		}
+
+		cur = next;
+		next = next->get_child_pointer().lock();
+	} 
 }
 
 int Path::get_endpoint_index(){

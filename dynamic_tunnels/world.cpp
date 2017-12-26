@@ -33,7 +33,7 @@ AABBTreeSphere* blocking_spheres_tree;
 vector<shared_ptr<Ball>> blocking_spheres;
 vector<shared_ptr<Ball>> protein_balls;
 
-bool TESTING_ENABLED = false;
+bool TESTING_ENABLED = true;
 
 double REPEATED_RUN_ITERATIONS_COEFFICIENT = 0.5;
 

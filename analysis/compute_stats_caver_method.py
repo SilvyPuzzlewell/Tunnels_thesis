@@ -102,8 +102,10 @@ def get_N_representation(tunnel, center):
 	#assign points to intervals  
 	for coordinate in tunnel:
 		distance = compute_distance(coordinate, beginning_point)
-		#print(distance)
-		#print(extreme_point_distance)
+		print(coordinate)
+		print(beginning_point)
+		print(distance)
+		print(extreme_point_distance)
 		#print("------")
 		interval = int(numpy.floor((distance / extreme_point_distance) * N))
 
@@ -214,6 +216,7 @@ for iteration_c in iterations: #iterating through folders containing tunnels fou
 		related_tunnel_index = -1
 
 		tunnel_array = tunnel_to_coordinate_representation(my_tunnel.readlines())
+		print(file)
 		tunnel_representation = get_N_representation(tunnel_array, center_coordinates)
 
 		for n in range(0, len(caver_tunnel_N_representations_list)):

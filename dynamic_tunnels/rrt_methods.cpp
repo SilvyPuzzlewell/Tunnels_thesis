@@ -303,6 +303,10 @@ bool test_path_noncolliding_static(shared_ptr<Path> tested_path){
       //cout << "beginning " << tested_path->get_beginning_index() << endl;
     for(std::map<int, shared_ptr<vertex>>::iterator iterator = map.begin(); iterator != map.end(); iterator++){
       //cout << "cur " << iterator->second->get_index() << endl;
+      if(isnan(iterator->second->get_location_coordinates()[0]) || isnan(iterator->second->get_location_coordinates()[1]) || isnan(iterator->second->get_location_coordinates()[2])){
+        cout << "NaN! " << endl;
+        create_segfault(); 
+      }
       if(is_in_obstacle(iterator->second->get_location_coordinates(), iterator->second->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES)){
         return false;
       }

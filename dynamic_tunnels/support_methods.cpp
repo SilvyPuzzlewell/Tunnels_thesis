@@ -8,11 +8,20 @@
 
 
 double* add_vectors(double* first, double* second, int mode){
+  if(isnan(first[0])){
+    create_segfault();
+  }
+  if(isnan(second[0])){
+    create_segfault();
+  }
   double* ret = new double[3]; //delet this later
   if(mode == ADDITION){
     ret[0] = first[0] + second[0]; ret[1] = first[1] + second[1]; ret[2] = first[2] + second[2];
   } else if(mode == SUBTRACTION){
     ret[0] = first[0] - second[0]; ret[1] = first[1] - second[1]; ret[2] = first[2] - second[2];
+  }
+  if(isnan(first[0])){
+    create_segfault();
   }
   return ret;
 }
@@ -23,6 +32,9 @@ double* copy_vector(double* vector){
   double* ret = new double[3]; //delet this later
   double x_coord = vector[0]; double y_coord = vector[1]; double z_coord = vector[2];
   ret[0] = x_coord; ret[1] = y_coord; ret[2] = z_coord;
+  if(isnan(ret[0])){
+    create_segfault();
+  }
   return ret;
 }
 //for sanity checks
@@ -33,6 +45,9 @@ double dot_product(double* first, double* second){
 void multiply_vector(double* array, double constant){
   for(int i = 0; i < 3; i++){
     array[i] = array[i] * constant;
+  }
+  if(isnan(array[0])){
+    create_segfault();
   }
 }
 
@@ -47,9 +62,17 @@ double vector_length(double* vector){
 //allocated with new
 void normalize_vector(double* vector,double normalised_length){
     double length = vector_length(vector);
-
+    if(length == 0){
+      create_segfault();
+    }
+    if(isnan(vector[0])){
+      create_segfault();
+    }
     for(int i = 0; i < 3; i++){
       vector[i] = (vector[i] / length) * normalised_length;
+    }
+    if(isnan(vector[0])){
+     create_segfault();
     }
 }
 
@@ -145,3 +168,13 @@ bool double_equals(double a, double b)
 void create_segfault(){
   raise(SIGSEGV);
 }
+
+void delete_vector(std::vector<double*> v){
+  //cout << "size pre " << v.size() << endl;
+  while(v.size() != 0){
+      double* deleted_ptr = v.back();
+      delete [] deleted_ptr;
+      v.pop_back();
+    }
+  //  cout << "size post " << v.size() << endl;
+} 

@@ -168,6 +168,8 @@ class Path: public Tree {
   int get_beginning_index();
   void set_beginning_index(int beginning_index);
 
+  void print_path();
+
   shared_ptr<vertex> get_endpoint_node();
   shared_ptr<vertex> get_beginning_node();
 };

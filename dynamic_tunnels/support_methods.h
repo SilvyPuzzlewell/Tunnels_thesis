@@ -32,6 +32,7 @@ bool double_equals(double a, double b);
 double* create_direction_vector(shared_ptr<vertex> target, shared_ptr<vertex> base, double length);
 //This is actually useful in debugging!
 void create_segfault();
+void delete_vector(std::vector<double*> v);
 
 
 #endif

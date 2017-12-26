@@ -501,11 +501,12 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
   }
 
   for(int i = interpolated_nodes.size() - 1; i >= first_valid; i--){
-
+    double epsilon = 0.00000001;
     ////cout << "first valid " << first_valid << endl;
     //cout << "number of nodes " << interpolated_nodes.size() << endl;
-
     if(i == (interpolated_nodes.size() - 1)){
+
+    //cout << "distance " << compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) << endl;
       if(TESTING_ENABLED){
         //rounding error checked
         if(compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) > (step + 0.001)){
@@ -516,6 +517,14 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
         }
       }
       //path is backtracked, trees are reconstructed -> process must stop and begin in new space.
+      //this is required because this method tends to use nodes which have virtually the same coordinates as their parents, that is unnecesary and can lead to problems later 
+      if(compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) < epsilon){
+        i--;
+        if(i < first_valid){
+          break;
+        }
+      }
+      cout << "distance " << compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) << endl;
       if(!add_node(nearest_neighbor_vertex,interpolated_nodes[i])){
         break;
       }
@@ -802,6 +811,10 @@ void write_paths_to_pdbs(std::string filename, std::vector<shared_ptr<Path>>& pa
   std::vector<shared_ptr<Path>>::iterator iterator;
   int i = 0;
   for(iterator = paths.begin(); iterator != paths.end(); iterator++){
+    if(!test_path_noncolliding_static(*iterator)){
+      cout << "path colliding before write!" <<endl;
+      create_segfault();
+   }
     std::ofstream file;
     std::string filename_appended(filename + to_string(i + 1));
     filename_appended.append(".pdb");
