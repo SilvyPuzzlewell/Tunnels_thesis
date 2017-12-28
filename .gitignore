@@ -56,3 +56,5 @@ skladka/
 pymol_pics/
 
 dynamic_tunnels/nolecule_data/
+
+*.log
