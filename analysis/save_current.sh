@@ -7,6 +7,7 @@ mkdir -p "$basedir/found_tunnels"
 
 python to_latex.py $1 >> latex_stats_code.txt
 mv latex_stats_code.txt "$basedir"
+mv runtime.log "$basedir"
 cp stats.txt "$basedir"
 cp $1 "$basedir"   #stats
 cp config.txt "$basedir"

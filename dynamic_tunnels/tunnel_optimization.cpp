@@ -777,7 +777,7 @@ int path_optimization(shared_ptr<Path> path){
   //path = smoothing(path);
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
   
-  cout << "path size bef " << path->get_size() << endl;
+  //cout << "path size bef " << path->get_size() << endl;
   //smooth_tunnel(path);
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding opt bef processing!" <<endl;
@@ -785,13 +785,13 @@ int path_optimization(shared_ptr<Path> path){
     }
 
   center_tunnel(path);
-  cout << "path size aft_ctr " << path->get_size() << endl;
+  //cout << "path size aft_ctr " << path->get_size() << endl;
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding opt_after_centr processing!" <<endl;
       create_segfault();
     }
   cut_tunnel(path);
-  cout << "path size aft_cut " << path->get_size() << endl;
+  //cout << "path size aft_cut " << path->get_size() << endl;
 
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding opt_post processing!" <<endl;

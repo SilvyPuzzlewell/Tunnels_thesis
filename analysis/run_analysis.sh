@@ -1,4 +1,4 @@
-inscape paint editor, nepouzivat bitmapy
+
 
 #!/bin/bash
 #rm -r ./caver_tunnels/*

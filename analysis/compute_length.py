@@ -2,21 +2,10 @@ import numpy
 import math
 from tabulate import tabulate
 import sys
+import os
 
 caver_tunnels_directory = "/home/fif/bak_repository/analysis/caver_tunnels"
-
-if len(sys.argv) > 1:
-	planFile = sys.argv[1]
-else:
-	planFile = "processed_stats.txt"
-
-file_table = open(planFile)
-file_lines = file_table.readlines()
-
-table_header = [' caver related tunnel number ', ' found % times ']
-
-data_table = []
-data_table.append(table_header)
+file = "lengths.txt"
 
 def line_to_numpy(line):
 	my_data = line.split()
@@ -53,22 +42,17 @@ def compute_tunnel_length(file):
 	return compute_length(caver_tunnel)
 
 
-for line in file_lines:
-	line = line.split()
-	if line[0] == "tunnel_num":
-		if float(line[5]) != 0:
-			caver_tunnel_length = compute_tunnel_length(line[1])
-			percentage = (float(line[5]) * 100)
-			data_line = [line[1] + " ( " + format(caver_tunnel_length, '.2f') + " ) ", 				format(percentage, '.2f') + "%"]
-			data_table.append(data_line)
-	else:
-		percentage = (float(line[11]) * 100)
-		data_line = [line[0] + " " + line[1], format(percentage, '.2f') + "%"]
-		data_table.append(data_line)
+out = open(file, "w")
+caver_tunnels = os.listdir(caver_tunnels_directory)
+for tunnel in caver_tunnels:
+	#print(tunnel)	
+	caver_tunnel_length = compute_tunnel_length(tunnel)
+	out.write(tunnel + " " + str(caver_tunnel_length) + "\n")
+
+	
 	
 
-print(tabulate(data_table, tablefmt="latex", floatfmt = ".2f"))
-print("\multicolumn{2}{c}{Item} \\")
+
 
 
 

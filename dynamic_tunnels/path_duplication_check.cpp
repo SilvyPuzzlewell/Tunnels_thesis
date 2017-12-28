@@ -362,10 +362,10 @@ int is_tunnel_duplicated(shared_ptr<Path> checked_path, std::vector<shared_ptr<P
 		//std::cout << "distance " << distance << std::endl;
 		//std::cout << "final N " << N << std::endl;
 		if(distance < MIN_VALID_INTERTUNNEL_DISTANCE * (N / 2)){
-			cout << endl;
+	//		cout << endl;
 			return i;
 		}
 	}
-	cout << endl; 
+	//cout << endl; 
 	return -1;
 }

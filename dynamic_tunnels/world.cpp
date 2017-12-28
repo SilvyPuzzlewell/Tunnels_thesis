@@ -33,7 +33,7 @@ AABBTreeSphere* blocking_spheres_tree;
 vector<shared_ptr<Ball>> blocking_spheres;
 vector<shared_ptr<Ball>> protein_balls;
 
-bool TESTING_ENABLED = true;
+bool TESTING_ENABLED = false;
 
 double REPEATED_RUN_ITERATIONS_COEFFICIENT = 0.5;
 
@@ -200,7 +200,7 @@ void load_parameters(string config_filename){
     inside_sampling_bias = stod(value, NULL);
     
   } else {
-    inside_sampling_bias = 3;
+    inside_sampling_bias = 0.5;
   }
 
   file >> dummy; file >> value;

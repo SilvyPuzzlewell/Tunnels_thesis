@@ -15,7 +15,7 @@ caver_tunnels_path = main_program_path + "caver_tunnels"
 found_tunnels_path = main_program_path + "found_tunnels/*/"
 
 N = 50 #default number of intervals
-interval_ratio_constant = 30 #into how much intervals are the paths divided, based on maximum number of tunnel atoms in current run, example for shortest path with 1000 atoms, run will be divided into 100 intervalsw with value 10 
+interval_ratio_constant = 10 #into how much intervals are the paths divided, based on maximum number of tunnel atoms in current run, example for shortest path with 1000 atoms, run will be divided into 100 intervalsw with value 10 
 Z_start_radius = 2
 Z_end_radius = 2
 #---parameters
@@ -102,13 +102,10 @@ def get_N_representation(tunnel, center):
 	#assign points to intervals  
 	for coordinate in tunnel:
 		distance = compute_distance(coordinate, beginning_point)
-		print(coordinate)
-		print(beginning_point)
-		print(distance)
-		print(extreme_point_distance)
 		#print("------")
 		interval = int(numpy.floor((distance / extreme_point_distance) * N))
-
+		#print(interval)
+		#print(len(counts))
 		#extreme point element would belong to new interval..
 		if interval == len(counts):
 			interval = interval - 1
@@ -126,6 +123,7 @@ def min_number_of_atoms(directory_path, directory_content):
 	min_count = sys.maxsize
 	for tunnel in directory_content:
 		num_lines = sum(1 for line in open(directory_path + "/" + tunnel))
+		#print(num_lines)
 		if num_lines < min_count:
 			min_count = num_lines
 	return min_count
@@ -170,6 +168,7 @@ def compute_tunnel_length_width(tunnel):
 
 caver_tunnels = os.listdir(caver_tunnels_path)
 N = int(numpy.floor(min_number_of_atoms(caver_tunnels_path, caver_tunnels) / interval_ratio_constant))
+print(N)
 caver_tunnel_N_representations_list = []
 indices_mapping = []
 lengths = open("lengths.txt", "w")

@@ -58,7 +58,7 @@ vector <int> paths_count;
 vector <bool> path_found_in_frame;
 //-----
 
-double maximum_increase = 1.5; //aximum increase in blocking sphere size due to many duplicates, in percents (1.5 = 150 percent bigger sphere)
+double maximum_increase = 1.1; //aximum increase in blocking sphere size due to many duplicates, in percents (1.5 = 150 percent bigger sphere)
 bool step_success_flag;        //used to determine succesful add to local tree, if fails global is tryied or if global doesn't exist, iteration fail
 
 bool LOCALIZED_MODE = false; 
@@ -524,7 +524,7 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
           break;
         }
       }
-      cout << "distance " << compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) << endl;
+      //cout << "distance " << compute_metric_eucleidean(nearest_neighbor_vertex->get_location_coordinates(), interpolated_nodes[i]->get_location_coordinates()) << endl;
       if(!add_node(nearest_neighbor_vertex,interpolated_nodes[i])){
         break;
       }
@@ -613,7 +613,7 @@ void restart(){
   is_local_tree_initialized = true;
 }
 
-void backtrack_process_path(shared_ptr<vertex> new_vertex ) {    
+void backtrack_process_path(shared_ptr<vertex> new_vertex ) {   
 		found = true;
     //new vertex is the last node added to terminated path
 		shared_ptr<Path> path = backtrack(new_vertex);
@@ -677,7 +677,7 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
 
     if(RESETED_TREE_MODE){
       restart();
-    }   
+    } 
 	}
 
 void print_vertex_coordinates(shared_ptr<vertex> vert){
