@@ -448,6 +448,8 @@ void Path::print_path(){
 	shared_ptr<vertex> next = cur->get_child_pointer().lock();
 	while(true){
 		cout << "index " << cur->get_index() << endl;
+		cout << "frame " << cur->get_frame_index() << endl;
+		cout << "is in path " << cur->is_in_path() << endl;
 		cout << "coordinates" << endl;
 		print_vector(cur->get_location_coordinates());
 		cout << "distance to next " << compute_metric_eucleidean(cur->get_location_coordinates(), next->get_location_coordinates()) << endl;
@@ -455,6 +457,8 @@ void Path::print_path(){
 		if(next->get_index() == endpoint_index){
 			cout << "endpoint " << endl;
 			cout << "index " << next->get_index() << endl;
+			cout << "frame " << next->get_frame_index() << endl;
+			cout << "is in path " << next->is_in_path() << endl;
 			cout << "coordinates" << endl;
 			print_vector(next->get_location_coordinates());
 			break;

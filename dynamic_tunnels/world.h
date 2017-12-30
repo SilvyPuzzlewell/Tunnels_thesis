@@ -183,6 +183,7 @@ extern void init_random();
 extern int num_blocking_spheres();
 extern void init_protein_struct();
 extern ozcollide::AABBTreeSphere* get_blocking_spheres_tree();
+extern ozcollide::AABBTreeSphere* get_frame_protein_tree(int frame);
 extern int get_blocking_spheres_tree_size();
 extern void print_blocking_spheres();
 extern void rebuild_protein_structure(double* new_sphere_coords, bool add_sphere);
@@ -203,7 +204,7 @@ class Ball{
   double* location_coordinates;
   double radius;
 };
-extern ozcollide::AABBTreeSphere* protein_tree;
+
 extern double probe_radius;
 extern double test_sphere_radius;
 

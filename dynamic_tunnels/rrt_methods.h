@@ -9,8 +9,11 @@ extern const int CHECK_WITH_BLOCKING_SPHERES;
 extern const int DONT_CHECK_WITH_BLOCKING_SPHERES;
 
 bool is_in_obstacle(double* loc_coord, double radius, int check_with_blocking_spheres);
-bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_blocking_spheres);
+bool is_in_obstacle(std::array<double, 3> loc_coord, double radius, int check_with_blocking_spheres);
+bool is_in_obstacle_custom_frame(double* loc_coord, double radius, int check_with_blocking_spheres, int frame);
+//bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_blocking_spheres);
 double approximate_radius(double* coordinates, double default_radius, double precision, double default_approximation_step);
+double approximate_radius_custom_frame(double* coordinates, double default_radius, double precision, double default_approximation_step, int frame);
 void cut_subtree_in_main_tree_recursion(shared_ptr<vertex> cur, bool has_debugging_output, bool is_local);
 void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debugging_output);
 void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only_valid_in_curframe);

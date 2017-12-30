@@ -24,13 +24,13 @@
 #include "path_duplication_check.h"
 #include "tunnel_optimization.h"
 #include "rrt_methods.h"
+#include "file_management_methods.h"
 
 using namespace std::chrono;
 using namespace ozcollide;
+
 //to do: nonholonomicky hledani, pridani kd stromu
 //parameters:
-
-
 //functions, structs definitions
 int find_nearest_vertex(double* loc_coord, MPNN::MultiANN<double>* kdTree);
 void write_paths_to_pdb(const char* filename, vector<shared_ptr<vertex>>& path);
@@ -65,7 +65,8 @@ bool LOCALIZED_MODE = false;
 //kept for debugging purposes---
 bool are_duplicated_pdbs_created = false;
 std::map <int, shared_ptr<vertex>> blocking_spheres_in_vertices;
-std::vector <shared_ptr<Path>> duplicated_paths;
+std::vector <std::vector<shared_ptr<Path>>> duplicated_paths;
+std::vector <shared_ptr<Path>> cluster_paths;
 //vector <vertex*> visualise_centring;
 //---
 
@@ -77,7 +78,7 @@ int num_of_duplicates = 0;
 
 
 //------program parameters  //consider using txt file
-const double DUPLICATION_CHECK_CONSTANT = 0.6; //ratio of inter-tunnel distance to tunnel length, if lower, tunnel is considered a duplicate of existing tunnel
+const double DUPLICATION_CHECK_CONSTANT = 1.2; //ratio of inter-tunnel distance to tunnel length, if lower, tunnel is considered a duplicate of existing tunnel
 const double BLOCKING_SPHERE_RADIUS_COEFFICIENT = 1.2;
 //******these are used for debugging purposes, set them to some absurd number for normal run
 const int MAX_DUPLICATES = 10000;               //num of duplicates before run terminates //
@@ -85,8 +86,21 @@ const int MAX_TUNNELS = 10000;                   //maximum number of tunnels bef
 //******
 //------
 
+//
+void add_cluster_path(shared_ptr<Path> added_path, int path_index){
+  if(duplicated_paths.size() <= path_index){
+    std::vector<shared_ptr<Path>> new_cluster;
+    new_cluster.push_back(added_path);
+    cout << "cluster " << new_cluster.size()<<endl;
+    duplicated_paths.push_back(new_cluster);
+    cout << "dupl" << duplicated_paths.size()<<endl;
+    return;
+  } 
 
-
+  if(!path_found_in_frame[path_index]){
+   duplicated_paths[path_index].push_back(added_path);
+  }
+}
 
 //obvious
 shared_ptr<vertex> load_parent_vertex_from_tree(shared_ptr<vertex> cur_vertex){
@@ -383,6 +397,12 @@ void add_blocking_sphere(double* coordinates, double radius){
 
 }
 
+void label_path_nodes(shared_ptr<Path> path, int path_index){
+  for(std::map<int, shared_ptr<vertex>>::iterator iterator = path->get_vertices().begin(); iterator != path->get_vertices().end(); iterator++){
+    iterator->second->set_in_path(path_index);    
+  }
+}
+
 void label_used_nodes(shared_ptr<Path> path, int path_index){
  // print_map_indices(path->get_vertices(), "debug");
  // cout << "labeling, frame " << get_current_frame() << endl;
@@ -647,23 +667,17 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
       duplicate_count.push_back(0);
       paths_count.push_back(1);
       path_found_in_frame.push_back(true);
+      add_cluster_path(path, paths.size() - 1);
       add_sphere = true;
     } else{
-      if(are_duplicated_pdbs_created){
-        duplicated_paths.push_back(path);
-        add_to_path_count(is_duplicate);
-        duplicate_count[is_duplicate] += 1;
-        //cout << paths_count[is_duplicate] << endl;
-        //exit(0);
-        add_sphere = true;
-      }
-      else {
-        add_to_path_count(is_duplicate);
-        //cout << paths_count[is_duplicate] << endl;
-        duplicate_count[is_duplicate] += 1;
-        add_sphere = true;
-      }
+      add_cluster_path(path, is_duplicate);
+      add_to_path_count(is_duplicate);
+      duplicate_count[is_duplicate] += 1;   
+      add_sphere = true;     
     }
+
+
+
     if(is_duplicate == -1){
      add_blocking_sphere(location_coordinates, blocking_sphere_radius);
     } else {
@@ -790,41 +804,7 @@ int find_nearest_vertex(double* loc_coord, MPNN::MultiANN<double>* kdTree){
 
 
 
-void write_to_pdb(ofstream& file, std::map<int, shared_ptr<vertex>>& atoms){
-  std::map<int, shared_ptr<vertex>>::iterator iterator;
-  for(iterator = atoms.begin(); iterator != atoms.end(); iterator++){
-      file << setprecision(3) << fixed;
-      file << "ATOM";
 
-      file.width(7); file << iterator->second->get_frame_index();
-      float c1 = 1;
-      file << "  N   ILE E  16";
-      file.width(12); file <<  iterator->second->get_location_coordinates()[0]; file.width(8); file <<  iterator->second->get_location_coordinates()[1]; file.width(8); file <<  iterator->second->get_location_coordinates()[2]; file.width(2); file.precision(2); file << "  "; file.width(4); file << c1;
-      file.width(1); file << " "; file.width(5); file << iterator->second->get_radius(); file.width(12); file << "N"<<endl;      
-  }
-}
-
-
-void write_paths_to_pdbs(std::string filename, std::vector<shared_ptr<Path>>& paths){
-
-  int counter = 0;
-  std::vector<shared_ptr<Path>>::iterator iterator;
-  int i = 0;
-  for(iterator = paths.begin(); iterator != paths.end(); iterator++){
-    if(!test_path_noncolliding_static(*iterator)){
-      cout << "path colliding before write!" <<endl;
-      create_segfault();
-   }
-    std::ofstream file;
-    std::string filename_appended(filename + to_string(i + 1));
-    filename_appended.append(".pdb");
-    file.open(filename_appended); 
-    std::cout << i << " " << filename_appended << endl;
-    write_to_pdb(file, (*iterator)->get_vertices());
-    file.close();
-    i++;
- }
-}
 
 int Ball::counter = 0;
 int vertex::vertex_counter = 0;
@@ -877,7 +857,7 @@ int main(int argc, char *argv[])
 
   int found_tunnels_count = paths.size();
   if(are_duplicated_pdbs_created){
-    paths.insert(paths.end(), duplicated_paths.begin(), duplicated_paths.end());
+   //  paths.insert(paths.end(), duplicated_paths.begin(), duplicated_paths.end());
   }
 
   for(int i = 0; i < paths.size(); i++){
@@ -902,6 +882,16 @@ int main(int argc, char *argv[])
       string directory_name(directory + "0");
       directory_name.append("/trajectory");
       write_paths_to_pdbs(directory_name,paths);
+    }
+    if(get_current_frame() > 1){
+      string clusters_directory = "./clusters/clusters";  // 0/clusters";
+      if(argc > 1){
+        clusters_directory.append(argv[1]);
+      } else {
+        clusters_directory.append("0");
+      }
+      clusters_directory.append("/cluster");
+      write_clusters_to_pdbs(clusters_directory, duplicated_paths);
     }
   }
   //cout << "copies count " << copies_count << endl;

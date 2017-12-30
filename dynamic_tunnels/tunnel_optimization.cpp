@@ -85,14 +85,24 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
   //maximum radius in default position, used in first iteration to find larger one 
   //cout << "first " << endl;
 
-  double cur_radius = approximate_radius(node_coordinates, centered_node->get_radius(), 0.01, 0.1);
+  
+  double cur_radius = approximate_radius_custom_frame(node_coordinates, centered_node->get_radius(), 0.01, 0.1, centered_node->get_frame_index());
   //sanity check
+  if(get_current_frame() == 2){
+    //cout << "index " << centered_node->get_index() << endl;
+    //cout << centered_node->get_frame_index() << endl;
+    //cout << "first " << approximate_radius_custom_frame(node_coordinates, centered_node->get_radius(), 0.01, 0.1, 1) << endl;
+    //cout << "second " << approximate_radius_custom_frame(node_coordinates, centered_node->get_radius(), 0.01, 0.1, 2) << endl;
+  //sanity check
+  //sanity check
+  }
+
   if(cur_radius == 0){
     cout << "centering node which is already colliding!" << endl;
     create_segfault();
   }
   //sanity check
-  if(is_in_obstacle(node_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
+  if(is_in_obstacle_custom_frame(node_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
     cout << "cur_radius_colliding pre" << endl;
     create_segfault();
   }
@@ -142,7 +152,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
       double* shifted_coordinates = add_vectors(shift_vector, node_coordinates, ADDITION);
 
       //... and maximum radius of ball in that placement is found, nodes with smaller than the largest last radius should be automatically discarded here
-      cur_radius = approximate_radius(shifted_coordinates, last_valid_radius, 0.01, 0.1);
+      cur_radius = approximate_radius_custom_frame(shifted_coordinates, last_valid_radius, 0.01, 0.1, centered_node->get_frame_index());
       //node is colliding
       if(cur_radius == 0){
         delete [] cur_perpendicular_vector; delete [] cur_second_perpendicular_vector; delete [] shift_vector; delete [] shifted_coordinates; 
@@ -150,13 +160,13 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
       }
       
       //sanity check
-      if(is_in_obstacle(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
+      if(is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
         cout << "cur_radius_colliding" <<endl;
         create_segfault();
       }
       //maximum radius in this position is checked subtracted from maximum radius found in previous iteration and checked against the maximum increase found in current iteration, which starts at zero,
       //therefore the new maximum radius must be greater than the previous one
-      if((cur_radius - check_radius) > max_increase && !is_in_obstacle(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)) {
+      if((cur_radius - check_radius) > max_increase && !is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())) {
         
         //cout << "sanity check " << are_neighbors_centered << endl;
         //--- can be buggy, check later
@@ -173,9 +183,9 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
           //print_vector(prev_node_shifted_coordinates);
           //cout << "next "<< is_in_obstacle(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES);
           //print_vector(next_node_shifted_coordinates);
-          if((next_node == NULL && !is_in_obstacle(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES))||
-            (next_node != NULL && !is_in_obstacle(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES) 
-              && !is_in_obstacle(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES))){
+          if((next_node == NULL && !is_in_obstacle_custom_frame(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, previous_node->get_frame_index()))||
+            (next_node != NULL && !is_in_obstacle_custom_frame(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, previous_node->get_frame_index()) 
+              && !is_in_obstacle_custom_frame(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, next_node->get_frame_index()))){
              //test was succesfull, node can be moved
              //new radius is assigned
              max_increase = cur_radius - check_radius;
@@ -244,7 +254,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
 
   if(!return_node_info){ //this is because we don't always want to allocate new memory
     delete [] node_coordinates;
-    if(is_in_obstacle(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES)){
+    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
       cout << "centered node colliding!" <<endl;
       create_segfault();
     }
@@ -257,7 +267,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
     double* ret = new double[4];
     ret[0] = node_coordinates[0]; ret[1] = node_coordinates[1]; ret[2] = node_coordinates[2]; ret[3] = cur_radius;
     delete [] node_coordinates;
-    if(is_in_obstacle(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES)){
+    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
       cout << "centered node colliding!" <<endl;
       create_segfault();
     } 
@@ -321,6 +331,26 @@ void smoothing(shared_ptr<Path> path){
   }
 }
 
+int is_node_duplicate(shared_ptr<vertex> cur_node, bool is_local){
+
+  int exists_in_path; 
+  if(is_local){
+    exists_in_path = local_priority_kdTree_coordinates->get_node_pointer(cur_node->get_index())->is_in_path();
+  } else {
+    exists_in_path = global_tree_points->get_node_pointer(cur_node->get_index())->is_in_path();
+  }
+
+  if(exists_in_path != -1){ 
+    if (cur_node->get_frame_index() == paths[exists_in_path]->get_node_pointer(cur_node->get_index())->get_frame_index()){
+      return exists_in_path;
+    } else {
+      return -1;
+    }
+  } else {
+    return -1;
+  }
+
+}
 
 
 void cut_tunnel(shared_ptr<Path> path){
@@ -329,8 +359,9 @@ void cut_tunnel(shared_ptr<Path> path){
 
   int endpoint_index = path->get_endpoint_index();
   int endpoint_parent_index = path->get_parent_index(endpoint_index);
+  bool is_local = path_vertices[endpoint_index]->is_local();
   //print_map_indices(path->get_vertices(), "cut tunnel");
-  while((endpoint_index != -1 && endpoint_parent_index != -1) && path->get_node_pointer(endpoint_index)->is_in_path() == -1){   //check also with global
+  while((endpoint_index != -1 && endpoint_parent_index != -1) && is_node_duplicate(path_vertices[endpoint_index], is_local) == -1){   
     //---
     /*
     path->print_nodes();
@@ -357,6 +388,9 @@ void cut_tunnel(shared_ptr<Path> path){
   //cout << "path endpoint index " << path->get_endpoint_index() <<endl;
   //cout << "deleted node index " << vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1] <<endl;
   int deleted_index = -1;
+  if(vertex_indices_to_be_deleted.size() == 0){
+    return;
+  }
   if(path->get_endpoint_index() != vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]){ //endpoint doesn't have child, would crash program
     deleted_index = path->get_child_index(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
   } else {
@@ -603,6 +637,8 @@ void smooth_tunnel(shared_ptr<Path> path){
 }
 
 
+
+
 void center_tunnel(shared_ptr<Path> path){
   //std::map<int, shared_ptr<vertex>>::iterator iterator;
 
@@ -619,6 +655,9 @@ void center_tunnel(shared_ptr<Path> path){
 
   //path->print_path();
   while(true){
+    if(get_current_frame() == 2){
+      //cout <<"shit "<< cur_node->get_index() << endl; 
+    }
     
     /*
     With reused tree, that already centered node is inside some previous trajectory. Therefore instead of costy centering procedure it can just be copied from that path.
@@ -627,23 +666,16 @@ void center_tunnel(shared_ptr<Path> path){
     Duplicated paths are deleted, therefore we must be sure to not index into them, this is achieved by calling the "labeling" function, which points the nodes in main data structures
     into valid paths, when the path is added into main paths vector 
     */
-    bool is_local = cur_node->is_local();
-    int exists_in_path = -1;
-    if(is_local){
-      exists_in_path = local_priority_kdTree_coordinates->get_node_pointer(cur_node->get_index())->is_in_path();
-    } else {
-      exists_in_path = global_tree_points->get_node_pointer(cur_node->get_index())->is_in_path();
-    }
+    //check if node exists in some other path and in the same frame
+    int related_node_path_index = is_node_duplicate(cur_node, cur_node->is_local());
 
-    if(exists_in_path != -1){
-      shared_ptr<vertex> related_node = paths[exists_in_path]->get_node_pointer(cur_node->get_index());
-      if(isnan(cur_node->get_location_coordinates()[0])){
-        create_segfault();
+    if(related_node_path_index != -1){
+      if(get_current_frame() == 2){
+        //cout <<"shit2 "<< cur_node->get_index() << endl; 
       }
+      shared_ptr<vertex> related_node = paths[related_node_path_index]->get_node_pointer(cur_node->get_index());
+      
       cur_node->set_coordinates(related_node->get_location_coordinates()); //copy identical nodes coordinates to current;
-      if(isnan(cur_node->get_location_coordinates()[0])){
-        create_segfault();
-      }
       cur_node->set_radius(related_node->get_radius());
 
       //cout << cur_node->get_index() << endl;
@@ -680,6 +712,7 @@ void center_tunnel(shared_ptr<Path> path){
 
     
     if(child_node != NULL){
+      
       if(isnan(cur_node->get_location_coordinates()[0])){
         create_segfault();
       }
@@ -687,6 +720,7 @@ void center_tunnel(shared_ptr<Path> path){
       if(isnan(cur_node->get_location_coordinates()[0])){
         create_segfault();
       }
+
 
     } else {
       if(isnan(cur_node->get_location_coordinates()[0])){
@@ -785,7 +819,7 @@ int path_optimization(shared_ptr<Path> path){
     }
 
   center_tunnel(path);
-  //cout << "path size aft_ctr " << path->get_size() << endl;
+  cout << "path size aft_ctr " << path->get_size() << endl;
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding opt_after_centr processing!" <<endl;
       create_segfault();

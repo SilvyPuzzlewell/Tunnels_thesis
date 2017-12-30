@@ -20,9 +20,10 @@ const int CHECK_WITH_BLOCKING_SPHERES = 1;
 const int DONT_CHECK_WITH_BLOCKING_SPHERES = 0;
 
 
-bool is_in_obstacle(double* loc_coord, double radius, int check_with_blocking_spheres){ 
+template <class T>
+bool is_in_obstacle_basic(T loc_coord, double radius, int check_with_blocking_spheres, int frame){
   high_resolution_clock::time_point t1 = high_resolution_clock::now(); 
- 
+
   static int col_counter = 0; 
   ozcollide::Sphere sphere; 
   sphere.center.x = loc_coord[0]; 
@@ -51,28 +52,43 @@ bool is_in_obstacle(double* loc_coord, double radius, int check_with_blocking_sp
       return false;} 
     break; 
     case DONT_CHECK_WITH_BLOCKING_SPHERES: 
-      returned = protein_tree->isCollideWithSphere(sphere); 
+      returned = get_frame_protein_tree(frame)->isCollideWithSphere(sphere); 
       t2 = high_resolution_clock::now(); 
       collision_check_time += duration_cast<microseconds>( t2 - t1 ).count(); 
       return returned; 
     break; 
     case CHECK_WITH_BLOCKING_SPHERES: 
-     bool has_collided_with_protein_structure = protein_tree->isCollideWithSphere(sphere); 
+     bool has_collided_with_protein_structure = get_frame_protein_tree(frame)->isCollideWithSphere(sphere); 
      bool has_collided_with_blocking_spheres; 
      if(num_blocking_spheres() >= 1){ 
         AABBTreeSphere* blocking_spheres_tree = get_blocking_spheres_tree(); 
         has_collided_with_blocking_spheres = blocking_spheres_tree->isCollideWithSphere(sphere);    
       } else {has_collided_with_blocking_spheres = false;} 
- 
-     t2 = high_resolution_clock::now(); 
-     collision_check_time += duration_cast<microseconds>( t2 - t1 ).count(); 
- 
+   
+      t2 = high_resolution_clock::now(); 
+      collision_check_time += duration_cast<microseconds>( t2 - t1 ).count();  
      return (has_collided_with_protein_structure || has_collided_with_blocking_spheres); 
     break; 
   } 
-} 
+
+}
+
+bool is_in_obstacle(double* loc_coord, double radius, int check_with_blocking_spheres){  
+  return is_in_obstacle_basic(loc_coord, radius, check_with_blocking_spheres, get_current_frame());       
+}
+
+bool is_in_obstacle(std::array<double, 3> loc_coord, double radius, int check_with_blocking_spheres){ 
+  return is_in_obstacle_basic(loc_coord, radius, check_with_blocking_spheres, get_current_frame());       
+}
+
+bool is_in_obstacle_custom_frame(double* loc_coord, double radius, int check_with_blocking_spheres, int frame){ 
+  return is_in_obstacle_basic(loc_coord, radius, check_with_blocking_spheres, frame);      
+}
+
+
  
 //lazy hack 
+/*
 bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_blocking_spheres){ 
   high_resolution_clock::time_point t1 = high_resolution_clock::now(); 
  
@@ -124,18 +140,24 @@ bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_bl
     break; 
   } 
 } 
+*/
 
-//function which returns approximation of maximal radius of sphere fitting into the tunnel, expects non-colliding sphere 
-double approximate_radius(double* coordinates, double default_radius, double precision, double default_approximation_step){
+
+
+
+
+double approximate_radius_basic(double* coordinates, double default_radius, double precision, double default_approximation_step, int frame){
+  //cout << "frame " << frame << endl;
+
   double approximation_step = default_approximation_step;
   double cur_radius = default_radius + approximation_step;
   double last_valid_radius = default_radius;
-  if(is_in_obstacle(coordinates, last_valid_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
+  if(is_in_obstacle_custom_frame(coordinates, last_valid_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, frame)){
      return 0;
   }
   while(approximation_step > precision && cur_radius < test_sphere_radius + 1){
     double test_radius = cur_radius + approximation_step;
-    bool hasCollided = is_in_obstacle(coordinates, test_radius, DONT_CHECK_WITH_BLOCKING_SPHERES);
+    bool hasCollided = is_in_obstacle_custom_frame(coordinates, test_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, frame);
     if(!hasCollided){
       cur_radius = test_radius;
       last_valid_radius = test_radius;
@@ -146,12 +168,23 @@ double approximate_radius(double* coordinates, double default_radius, double pre
       
     }
   }
-  if(is_in_obstacle(coordinates, last_valid_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
+  if(is_in_obstacle_custom_frame(coordinates, last_valid_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, frame)){
       cout << "approximated radius colliding!" <<endl;
       create_segfault();
     }
   return last_valid_radius;
 }
+
+//function which returns approximation of maximal radius of sphere fitting into the tunnel, expects non-colliding sphere 
+double approximate_radius(double* coordinates, double default_radius, double precision, double default_approximation_step){
+  return approximate_radius_basic(coordinates, default_radius, precision, default_approximation_step, get_current_frame());
+}
+
+//function which returns approximation of maximal radius of sphere fitting into the tunnel, expects non-colliding sphere 
+double approximate_radius_custom_frame(double* coordinates, double default_radius, double precision, double default_approximation_step, int frame){
+  return approximate_radius_basic(coordinates, default_radius, precision, default_approximation_step, frame);
+}
+
 
  
 //recursive function deleting all children of particular node, remember paths nodes are copied and have their respective children at ending position of chidren_vertices(.. i should 
@@ -296,22 +329,40 @@ int add_to_tree(double* loc_coord, int tree_index, MPNN::MultiANN<double>* kdTre
     MPNN::annDeallocPt(annpt);
 }
 
-bool test_path_noncolliding_static(shared_ptr<Path> tested_path){
-  if(TESTING_ENABLED){
-    std::map<int, shared_ptr<vertex>> map = tested_path->get_vertices();
-      //cout << "endpoint " << tested_path->get_endpoint_index() << endl;
-      //cout << "beginning " << tested_path->get_beginning_index() << endl;
-    for(std::map<int, shared_ptr<vertex>>::iterator iterator = map.begin(); iterator != map.end(); iterator++){
-      //cout << "cur " << iterator->second->get_index() << endl;
-      if(isnan(iterator->second->get_location_coordinates()[0]) || isnan(iterator->second->get_location_coordinates()[1]) || isnan(iterator->second->get_location_coordinates()[2])){
-        cout << "NaN! " << endl;
+bool test_path_noncolliding_static(shared_ptr<Path> path){
+
+  shared_ptr<vertex> cur = path->get_beginning_node();
+  shared_ptr<vertex> next = cur->get_child_pointer().lock();
+  while(true){
+    if(isnan(cur->get_location_coordinates()[0]) || isnan(cur->get_location_coordinates()[1]) || isnan(cur->get_location_coordinates()[2])){
+      cout << "TESTING ERROR: NaN! " << endl;
+      create_segfault(); 
+    }
+    if(is_in_obstacle_custom_frame(cur->get_location_coordinates(), cur->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, cur->get_frame_index())){
+      cout << "TESTING ERROR: NODE IN PATH IS COLLIDING!" << endl;
+      return false;
+    }
+    if(next->get_frame_index() < cur->get_frame_index()){
+      cout << "TESTING ERROR: PROBE IS NOT A FUCKING TARDIS!" << endl;
+      return false;
+    }
+
+    if(next->get_index() == path->get_endpoint_index()){
+      if(isnan(next->get_location_coordinates()[0]) || isnan(next->get_location_coordinates()[1]) || isnan(next->get_location_coordinates()[2])){
+        cout << "TESTING ERROR: NaN! " << endl;
         create_segfault(); 
       }
-      if(is_in_obstacle(iterator->second->get_location_coordinates(), iterator->second->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES)){
+      if(is_in_obstacle_custom_frame(next->get_location_coordinates(), next->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, next->get_frame_index())){
+        cout << "TESTING ERROR: NODE IN PATH IS COLLIDING!" << endl;
         return false;
       }
+      break;
     }
-  }
+
+    cur = next;
+    next = next->get_child_pointer().lock();
+  } 
+
   return true;
 } 
  

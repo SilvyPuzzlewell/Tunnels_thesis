@@ -21,19 +21,21 @@ using namespace ozcollide;
 void create_spheres(const std::vector<Ball*> &balls);
 vector<shared_ptr<Ball>>& add_ball(double x, double y, double z, double radius, vector<shared_ptr<Ball>> &balls);
 //vector<Ball*>& add_ball(double* loc_coord, double radius, vector<Ball*> &balls);
-void delete_protein_structure();
 void delete_blocking_spheres(bool is_vector_cleared);
 AABBTreeSphere* build_collision_structure(const vector<shared_ptr<Ball>> &balls, bool output);
 
 
-AABBTreeSphere* protein_tree;
+//AABBTreeSphere* protein_tree;
+
+//In multiframe backtracking, each node needs to be centered around it's particular frame, so the frame must be stored if we need the centering
+vector<AABBTreeSphere*> protein_tree_archive;
 AABBTreeSphere* blocking_spheres_tree;
 
 
 vector<shared_ptr<Ball>> blocking_spheres;
 vector<shared_ptr<Ball>> protein_balls;
 
-bool TESTING_ENABLED = false;
+bool TESTING_ENABLED = true;
 
 double REPEATED_RUN_ITERATIONS_COEFFICIENT = 0.5;
 
@@ -114,6 +116,12 @@ void print_frame_borders(){
   cout << "z: " << world_size_z_shift << " : " << world_size_z + world_size_z_shift << endl;
   cout << "end printing frame borders" << endl; 
 }
+
+//frames are indexed from one, to avoid confusion
+AABBTreeSphere* get_frame_protein_tree(int frame){
+  return protein_tree_archive[frame - 1];
+}
+
 AABBTreeSphere* get_blocking_spheres_tree(){
   //cout << "num l out" << blocking_spheres_tree->getNbLeafs() << endl;
   return blocking_spheres_tree;
@@ -298,12 +306,14 @@ void init_protein_struct(){
     atoms = atoms_from_file(ss.str());
   }
  // cout << "atoms size bef " << atoms.size() <<endl; 
-  protein_tree = build_collision_structure(atoms, false);
+  AABBTreeSphere* protein_tree = build_collision_structure(atoms, false);
+  protein_tree_archive.push_back(protein_tree);
   //cout << "atoms size aft " << atoms.size()<<endl; 
   
   atoms.clear();
   //cout << "atoms size aft 2 " << atoms.size()<<endl; 
 }
+
 
 void run_next_frame(){
   cur_frame++;
@@ -314,21 +324,10 @@ void run_next_frame(){
   //blocking_spheres.clear();
   //blocking_spheres_tree = build_protein_structure(blocking_spheres);
   delete_blocking_spheres(true);
-  delete_protein_structure();
   init_protein_struct();
 }
 
 
-void rebuild_protein_structure(double* new_sphere_coords, bool add_sphere, string file_name){
-  delete_protein_structure();
-  vector<shared_ptr<Ball>> atoms = atoms_from_file(file_name);
- // cout << new_sphere_coords[0] << " " << new_sphere_coords[1] << " " << new_sphere_coords[2] << endl;
-  //if(add_sphere)add_ball(new_sphere_coords[0], new_sphere_coords[1], new_sphere_coords[2], test_sphere_radius, blocking_spheres);
-  for(int i = 0; i < blocking_spheres.size(); i++){
-    atoms.push_back(blocking_spheres[i]);
-  }
-  protein_tree = build_collision_structure(atoms, false);
-}
 void rebuild_blocking_spheres_structure(double* obstacle_loccoord, double radius){
   //cout << "BLOCKING_SPHERES_STRUCTURE_SIZE " << blocking_spheres.size() << endl;
   if(blocking_spheres.size() != 0) {
@@ -385,10 +384,6 @@ AABBTreeSphere* build_collision_structure(const vector<shared_ptr<Ball>> &balls,
   delete [] spheres;
   spheres = NULL;
   return tree;
-}
-
-void delete_protein_structure(){
-  delete protein_tree;
 }
 
 void delete_blocking_spheres(bool is_vector_cleared){
