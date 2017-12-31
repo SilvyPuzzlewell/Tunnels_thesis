@@ -716,7 +716,7 @@ void center_tunnel(shared_ptr<Path> path){
       if(isnan(cur_node->get_location_coordinates()[0])){
         create_segfault();
       }
-      center_node(cur_node, parent_node, child_node, direction_vector, 0.5, true, true, false);
+      center_node(cur_node, parent_node, child_node, direction_vector, 0.5, false, true, false);
       if(isnan(cur_node->get_location_coordinates()[0])){
         create_segfault();
       }
@@ -795,7 +795,7 @@ void center_tunnel_without_erasing(shared_ptr<Path> path){
     double* direction_vector = add_vectors(cur->get_location_coordinates(), parent->get_location_coordinates(), SUBTRACTION);
   
     //if(!is_endpoint) cout << "child_node " << child->get_index() << endl;
-    center_node(cur, parent, child, direction_vector, 1, !is_endpoint, true, false);
+    center_node(cur, parent, child, direction_vector, 1, false, true, false);
     delete [] direction_vector;
     if(is_endpoint){
       break;
@@ -819,7 +819,7 @@ int path_optimization(shared_ptr<Path> path){
     }
 
   center_tunnel(path);
-  cout << "path size aft_ctr " << path->get_size() << endl;
+ // cout << "path size aft_ctr " << path->get_size() << endl;
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding opt_after_centr processing!" <<endl;
       create_segfault();

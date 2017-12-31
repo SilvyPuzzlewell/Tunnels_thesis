@@ -356,16 +356,18 @@ int is_tunnel_duplicated(shared_ptr<Path> checked_path, std::vector<shared_ptr<P
 	N_representation(existing_paths, checked_path);
 	//cout << "N " << N << std::endl;
 	//cout << "checked N repr " << checked_path->N_representation.size() << endl;
+	double min_distance = DBL_MAX;
+	double return_index = -1;
 	for(int i = 0; i < existing_paths.size(); i++){
 	//	cout << "checked against N repr " << existing_paths[i]->N_representation.size() << endl;                         
 		double distance = compute_intertunnel_distance_by_N_representations(existing_paths[i], checked_path);
 		//std::cout << "distance " << distance << std::endl;
 		//std::cout << "final N " << N << std::endl;
-		if(distance < MIN_VALID_INTERTUNNEL_DISTANCE * (N / 2)){
-	//		cout << endl;
-			return i;
+		if((distance < MIN_VALID_INTERTUNNEL_DISTANCE * (N / 2)) && distance < min_distance){
+			min_distance = distance;
+			return_index = i;
 		}
 	}
 	//cout << endl; 
-	return -1;
+	return return_index;
 }

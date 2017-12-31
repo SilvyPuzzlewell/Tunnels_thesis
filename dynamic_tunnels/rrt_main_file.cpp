@@ -91,9 +91,9 @@ void add_cluster_path(shared_ptr<Path> added_path, int path_index){
   if(duplicated_paths.size() <= path_index){
     std::vector<shared_ptr<Path>> new_cluster;
     new_cluster.push_back(added_path);
-    cout << "cluster " << new_cluster.size()<<endl;
+    //cout << "cluster " << new_cluster.size()<<endl;
     duplicated_paths.push_back(new_cluster);
-    cout << "dupl" << duplicated_paths.size()<<endl;
+    //cout << "dupl" << duplicated_paths.size()<<endl;
     return;
   } 
 
