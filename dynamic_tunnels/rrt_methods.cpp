@@ -268,20 +268,11 @@ void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debu
 void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only_valid_in_curframe){
   //cout << "rebuild status " << status <<endl;
   if(is_initialized){
-    if(status == GLOBAL || status == BOTH) {delete global_kdTree;}
-    if(status == LOCAL || status == BOTH) {delete local_priority_kdTree;}
+    delete local_priority_kdTree;
   }
-  if(status == GLOBAL || status == BOTH)build_tree(GLOBAL);
-  if(status == LOCAL || status == BOTH)build_tree(LOCAL);
+  build_tree(LOCAL);
   
-  if(copy_stuff && (status == GLOBAL || status == BOTH)){
-    std::map<int, shared_ptr<vertex>> graph_points = global_tree_points->get_vertices();
-    cout << "rebuild glob " << graph_points.size() << endl;
-    for (std::map<int, shared_ptr<vertex>>::iterator iterator = graph_points.begin(); iterator != graph_points.end(); iterator++){
-      add_to_tree(iterator->second->get_location_coordinates(), iterator->second->get_index(), global_kdTree);
-    }
-  }
-  if(copy_stuff && (status == LOCAL || status == BOTH)){
+  if(copy_stuff){
 
     std::map<int, shared_ptr<vertex>> graph_points_loc = local_priority_kdTree_coordinates->get_vertices();
     //cout << "rebuild loc " << graph_points_loc.size() << endl;
@@ -290,7 +281,7 @@ void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only
         add_to_tree(iterator->second->get_location_coordinates(), iterator->second->get_index(), local_priority_kdTree);
       }
       else{
-        if(iterator->second->get_last_valid_frame() == get_current_frame()){
+        if(!iterator->second->is_inactive()){
           add_to_tree(iterator->second->get_location_coordinates(), iterator->second->get_index(), local_priority_kdTree);
         }
       } 
@@ -338,12 +329,16 @@ bool test_path_noncolliding_static(shared_ptr<Path> path){
       cout << "TESTING ERROR: NaN! " << endl;
       create_segfault(); 
     }
-    if(is_in_obstacle_custom_frame(cur->get_location_coordinates(), cur->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, cur->get_frame_index())){
+    if(is_in_obstacle_custom_frame(cur->get_location_coordinates(), cur->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, cur->get_first_frame())){
       cout << "TESTING ERROR: NODE IN PATH IS COLLIDING!" << endl;
+      cout << "cur " << cur->get_index() << endl; 
+      path->print_path();
       return false;
     }
-    if(next->get_frame_index() < cur->get_frame_index()){
+    if(next->get_first_frame() != cur->get_last_valid_frame()){
       cout << "TESTING ERROR: PROBE IS NOT A FUCKING TARDIS!" << endl;
+      cout << "cur " << cur->get_index() << endl; 
+      path->print_path();
       return false;
     }
 
@@ -352,7 +347,7 @@ bool test_path_noncolliding_static(shared_ptr<Path> path){
         cout << "TESTING ERROR: NaN! " << endl;
         create_segfault(); 
       }
-      if(is_in_obstacle_custom_frame(next->get_location_coordinates(), next->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, next->get_frame_index())){
+      if(is_in_obstacle_custom_frame(next->get_location_coordinates(), next->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, next->get_first_frame())){
         cout << "TESTING ERROR: NODE IN PATH IS COLLIDING!" << endl;
         return false;
       }

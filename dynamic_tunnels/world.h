@@ -49,7 +49,7 @@ extern MPNN::MultiANN<double> *local_priority_kdTree;
 
 class vertex {
   private:
-  vector<int> valid_frames; // frames in which this vertex is valid, should be sorted from lowest
+  //vector<int> valid_frames; // frames in which this vertex is valid, should be sorted from lowest
   int exists_in_path;        // pointer into path in which the index; paths doesn't have explicit indexing, index into vector "paths" is used, this method expects paths in "paths" to not be deleted, if they are, this will cause crash
                             // or invalid results!
   vector<weak_ptr<vertex>> children_pointers;
@@ -61,24 +61,27 @@ class vertex {
   double radius;
   int frame_index; //used only for path vertices, denotes frame in which the vertex is in the path
 
+  int first_frame;
+  int last_valid_frame;
+  bool inactive;
+
   public:
   static int vertex_counter;                 //predelat na class a dopsat destruktor
   
-  vertex(double* location_coordinates_raw, shared_ptr<vertex> parent_pointer, int index, double radius, int cur_frame, bool local);
-  vertex(double* location_coordinates_raw, int index, double radius, int cur_frame, bool local);
+  vertex(double* location_coordinates_raw, shared_ptr<vertex> parent_pointer, int index, double radius, int first_frame, int last_valid_frame, bool local);
+  vertex(double* location_coordinates_raw, int index, double radius, int first_frame, int last_valid_frame, bool local);
   ~vertex();
 
-  int find_previous_frame(int frame);
-  int get_last_valid_frame();
+  //int find_previous_frame(int frame);
+  //int get_last_valid_frame();
   shared_ptr<vertex> copy();
   shared_ptr<vertex> copy_without_structure_pointers();
   double* copy_coordinates();
   void set_coordinates(double* location_coordinates_raw);
-  void add_valid_frame(int frame);
+  //void add_valid_frame(int frame);
   int is_in_path();
   bool is_in_some_valid_path();
   void set_in_path(int index);
-  bool is_valid_in_frame(int frame);
 
   int get_index();
   void set_index(int index);
@@ -105,14 +108,23 @@ class vertex {
 
   void delete_child(int index); //index is into the structure, not node index!
 
-  void set_frame_index(int frame_index);
-  int get_frame_index(); 
+  //void set_frame_index(int frame_index);
+  //int get_frame_index(); 
   void set_radius(double radius);
   double get_radius();
   double* get_location_coordinates();
 
   weak_ptr<vertex> get_child_pointer_null_permisive();
   weak_ptr<vertex> get_parent_pointer_null_permisive();
+
+  //void set_first_frame(int first_frame);
+  void set_last_valid_frame(int last_valid_frame);
+  void set_inactive(bool inactive);
+  int get_first_frame();
+  int get_last_valid_frame();
+  bool is_inactive();
+  bool is_in_more_frames(); //shortcut for detecting time leaps, useful in tunnel optimization
+  bool is_valid_in_frame(int frame);
   
 }; 
 
@@ -133,6 +145,7 @@ class Tree {
   int get_children_count(int index);
   void delete_node(int index);
   void reset();
+  void print_vertices();
 };
 
 class Path: public Tree { 

@@ -15,7 +15,7 @@ using namespace std;
 
 
 
-vertex::vertex(double* location_coordinates_raw, shared_ptr<vertex> parent_pointer, int index, double radius, int cur_frame, bool local){
+vertex::vertex(double* location_coordinates_raw, shared_ptr<vertex> parent_pointer, int index, double radius, int first_frame, int last_valid_frame, bool local){
     double* location_coordinates = new double[3]; location_coordinates[0] = location_coordinates_raw[0]; location_coordinates[1] = location_coordinates_raw[1]; location_coordinates[2] = location_coordinates_raw[2];
 	this->location_coordinates = location_coordinates;
 	this->parent_pointer = parent_pointer;
@@ -23,14 +23,18 @@ vertex::vertex(double* location_coordinates_raw, shared_ptr<vertex> parent_point
 	this->index = index;
 	this->local = local;
 	vertex_counter++;
-	if(cur_frame != -1){ //-1 is used when for constructor in copying vertex, because we don't want to add new valid frame to it
-		valid_frames.push_back(cur_frame);
+	if(first_frame != -1){ //-1 is used when for constructor in copying vertex, because we don't want to add new valid frame to it
+		this->first_frame = first_frame;
+	}
+	if(last_valid_frame != -1){ //-1 is used when for constructor in copying vertex, because we don't want to add new valid frame to it
+		this->last_valid_frame = last_valid_frame;
 	}
 	exists_in_path = -1; //newly created vertex doesn't exist in any path
 	frame_index = 0; //initialization without path frame denotion
+	inactive = false;
 }
 
-vertex::vertex(double* location_coordinates_raw, int index, double radius, int cur_frame, bool local){
+vertex::vertex(double* location_coordinates_raw, int index, double radius, int first_frame, int last_valid_frame, bool local){
     double* location_coordinates = new double[3]; location_coordinates[0] = location_coordinates_raw[0]; location_coordinates[1] = location_coordinates_raw[1]; location_coordinates[2] = location_coordinates_raw[2];
 	this->location_coordinates = location_coordinates;
 	//parent_pointer = NULL;
@@ -38,11 +42,15 @@ vertex::vertex(double* location_coordinates_raw, int index, double radius, int c
 	this->index = index;
 	this->local = local;
 	vertex_counter++;
-	if(cur_frame != -1){ //-1 is used when for constructor in copying vertex, because we don't want to add new valid frame to it
-		valid_frames.push_back(cur_frame);
+	if(first_frame != -1){ //-1 is used when for constructor in copying vertex, because we don't want to add new valid frame to it
+		this->first_frame = first_frame;
+	}
+	if(last_valid_frame != -1){ //-1 is used when for constructor in copying vertex, because we don't want to add new valid frame to it
+		this->last_valid_frame = last_valid_frame;
 	}
 	exists_in_path = -1; //newly created vertex doesn't exist in any path
 	frame_index = 0; //initialization without path frame denotion
+	inactive = false;
 }
 
 vertex::~vertex(){
@@ -54,13 +62,14 @@ vertex::~vertex(){
 shared_ptr<vertex> vertex::copy(){
 	shared_ptr<vertex> ret = this->copy_without_structure_pointers();
 	ret->children_pointers = this->children_pointers;
-	ret->valid_frames = this->valid_frames;
+
 	return ret;
 }
 
 shared_ptr<vertex> vertex::copy_without_structure_pointers(){
-	shared_ptr<vertex> ret = make_shared<vertex>(this->location_coordinates,this->index, this->radius, -1, this->local);
-	ret->valid_frames = this->valid_frames;
+	shared_ptr<vertex> ret = make_shared<vertex>(this->location_coordinates,this->index, this->radius, -1, -1, this->local);
+	ret->first_frame = this->first_frame;
+	ret->last_valid_frame = this->last_valid_frame;
 	//cout << "SHARED COPIED " << ret.use_count() << endl;
 	return ret;
 }
@@ -78,24 +87,7 @@ void vertex::set_coordinates(double* location_coordinates_raw){
 	
 }
 
-void vertex::add_valid_frame(int frame){
-	valid_frames.push_back(frame);
-}
 
-//expects sorted array, so it can find the largest passable frame
-//it should return the next after the one passed in argument, therefore it should run in 1 time and should not require sophisticated search method
-int vertex::find_previous_frame(int frame){
-	for(int i = valid_frames.size() - 1; i >= 0; i--){
-		if(valid_frames[i] < frame){
-			return valid_frames[i];
-		}
-	}
-	//cout << "fail " << valid_frames.size() << " " << frame << " " << valid_frames[0] << endl;
-	return -1; //no previous frame exists
-}
-int vertex::get_last_valid_frame(){
-	return valid_frames.back();
-}
 
 int vertex::is_in_path(){
 	return exists_in_path;
@@ -109,10 +101,6 @@ void vertex::set_in_path(int new_index){
 	this->exists_in_path = new_index;
 }
 
-bool vertex::is_valid_in_frame(int frame){
-	//cout << "i" << endl;
-	return std::binary_search(valid_frames.begin(), valid_frames.end(), frame);
-}
 int vertex::get_index(){
 	return index;
 }
@@ -241,13 +229,7 @@ void vertex::set_child_pointer(shared_ptr<vertex> child_pointer){
 	}
 }
 
-void vertex::set_frame_index(int frame_index){
-	this->frame_index = frame_index;
-}
 
-int vertex::get_frame_index(){
-	return frame_index;
-}
 
 int vertex::get_child_index(int index){
 	if(children_pointers.size() == 0){
@@ -266,6 +248,44 @@ weak_ptr<vertex> vertex::get_parent_pointer(){
 weak_ptr<vertex> vertex::get_parent_pointer_null_permisive(){
 	return parent_pointer;
 }
+
+
+
+//void vertex::set_first_frame(int first_frame){
+// 	this->first_frame = first_frame;
+//}
+void vertex::set_last_valid_frame(int last_valid_frame){
+	this->last_valid_frame = last_valid_frame;
+}
+void vertex::set_inactive(bool inactive){
+	this->inactive = inactive;
+}
+int vertex::get_first_frame(){
+	return first_frame;
+}
+int vertex::get_last_valid_frame(){
+	return last_valid_frame;
+}
+
+bool vertex::is_inactive(){
+	return inactive;
+} //shortcut for detecting time leaps, useful in tunnel optimization
+bool vertex::is_in_more_frames(){
+	return last_valid_frame - first_frame == 0 ? false : true;
+}
+bool vertex::is_valid_in_frame(int frame){
+	//sanity check 
+	if(first_frame > last_valid_frame){
+		cout << "OBSTACLE.cpp, is_valid_in_frame insane " << endl;
+		create_segfault();
+	}
+	if(frame <= last_valid_frame && frame >= first_frame){
+		return true;
+	} else {
+		return false;
+	}
+} 
+
 
 Path::Path(int beginning_index, int endpoint_index, int current_frame): beginning_index(beginning_index), endpoint_index(endpoint_index){
 	valid_frames.push_back(current_frame);
@@ -342,6 +362,10 @@ void Tree::delete_node(int index){
 
 void Tree::reset(){
 	path_vertices.clear();
+}
+
+void Tree::print_vertices(){
+	print_map_indices(path_vertices, "");
 }
 
 void Path::add_node(shared_ptr<vertex> node){
@@ -448,7 +472,8 @@ void Path::print_path(){
 	shared_ptr<vertex> next = cur->get_child_pointer().lock();
 	while(true){
 		cout << "index " << cur->get_index() << endl;
-		cout << "frame " << cur->get_frame_index() << endl;
+		cout << "first frame " << cur->get_first_frame() << endl;
+		cout << "last valid frame " << cur->get_last_valid_frame() << endl;
 		cout << "is in path " << cur->is_in_path() << endl;
 		cout << "coordinates" << endl;
 		print_vector(cur->get_location_coordinates());
@@ -457,7 +482,8 @@ void Path::print_path(){
 		if(next->get_index() == endpoint_index){
 			cout << "endpoint " << endl;
 			cout << "index " << next->get_index() << endl;
-			cout << "frame " << next->get_frame_index() << endl;
+			cout << "first frame " << next->get_first_frame() << endl;
+			cout << "last valid frame " << next->get_last_valid_frame() << endl;
 			cout << "is in path " << next->is_in_path() << endl;
 			cout << "coordinates" << endl;
 			print_vector(next->get_location_coordinates());

@@ -1,5 +1,6 @@
 #include <chrono>
 #include <time.h>
+#include <queue>
 
 #include "world.h"
 #include "obstacle.h"
@@ -86,7 +87,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
   //cout << "first " << endl;
 
   
-  double cur_radius = approximate_radius_custom_frame(node_coordinates, centered_node->get_radius(), 0.01, 0.1, centered_node->get_frame_index());
+  double cur_radius = approximate_radius_custom_frame(node_coordinates, centered_node->get_radius(), 0.01, 0.1, centered_node->get_first_frame());
   //sanity check
   if(get_current_frame() == 2){
     //cout << "index " << centered_node->get_index() << endl;
@@ -102,7 +103,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
     create_segfault();
   }
   //sanity check
-  if(is_in_obstacle_custom_frame(node_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
+  if(is_in_obstacle_custom_frame(node_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
     cout << "cur_radius_colliding pre" << endl;
     create_segfault();
   }
@@ -152,7 +153,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
       double* shifted_coordinates = add_vectors(shift_vector, node_coordinates, ADDITION);
 
       //... and maximum radius of ball in that placement is found, nodes with smaller than the largest last radius should be automatically discarded here
-      cur_radius = approximate_radius_custom_frame(shifted_coordinates, last_valid_radius, 0.01, 0.1, centered_node->get_frame_index());
+      cur_radius = approximate_radius_custom_frame(shifted_coordinates, last_valid_radius, 0.01, 0.1, centered_node->get_first_frame());
       //node is colliding
       if(cur_radius == 0){
         delete [] cur_perpendicular_vector; delete [] cur_second_perpendicular_vector; delete [] shift_vector; delete [] shifted_coordinates; 
@@ -160,13 +161,13 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
       }
       
       //sanity check
-      if(is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
+      if(is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
         cout << "cur_radius_colliding" <<endl;
         create_segfault();
       }
       //maximum radius in this position is checked subtracted from maximum radius found in previous iteration and checked against the maximum increase found in current iteration, which starts at zero,
       //therefore the new maximum radius must be greater than the previous one
-      if((cur_radius - check_radius) > max_increase && !is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())) {
+      if((cur_radius - check_radius) > max_increase && !is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())) {
         
         //cout << "sanity check " << are_neighbors_centered << endl;
         //--- can be buggy, check later
@@ -183,9 +184,9 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
           //print_vector(prev_node_shifted_coordinates);
           //cout << "next "<< is_in_obstacle(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES);
           //print_vector(next_node_shifted_coordinates);
-          if((next_node == NULL && !is_in_obstacle_custom_frame(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, previous_node->get_frame_index()))||
-            (next_node != NULL && !is_in_obstacle_custom_frame(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, previous_node->get_frame_index()) 
-              && !is_in_obstacle_custom_frame(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, next_node->get_frame_index()))){
+          if((next_node == NULL && !is_in_obstacle_custom_frame(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, previous_node->get_last_valid_frame()))||
+            (next_node != NULL && !is_in_obstacle_custom_frame(prev_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, previous_node->get_last_valid_frame()) 
+              && !is_in_obstacle_custom_frame(next_node_shifted_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, next_node->get_last_valid_frame()))){
              //test was succesfull, node can be moved
              //new radius is assigned
              max_increase = cur_radius - check_radius;
@@ -254,7 +255,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
 
   if(!return_node_info){ //this is because we don't always want to allocate new memory
     delete [] node_coordinates;
-    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
+    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
       cout << "centered node colliding!" <<endl;
       create_segfault();
     }
@@ -267,7 +268,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
     double* ret = new double[4];
     ret[0] = node_coordinates[0]; ret[1] = node_coordinates[1]; ret[2] = node_coordinates[2]; ret[3] = cur_radius;
     delete [] node_coordinates;
-    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_frame_index())){
+    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
       cout << "centered node colliding!" <<endl;
       create_segfault();
     } 
@@ -341,7 +342,7 @@ int is_node_duplicate(shared_ptr<vertex> cur_node, bool is_local){
   }
 
   if(exists_in_path != -1){ 
-    if (cur_node->get_frame_index() == paths[exists_in_path]->get_node_pointer(cur_node->get_index())->get_frame_index()){
+    if (cur_node->get_first_frame() == paths[exists_in_path]->get_node_pointer(cur_node->get_index())->get_first_frame()){
       return exists_in_path;
     } else {
       return -1;
@@ -353,7 +354,7 @@ int is_node_duplicate(shared_ptr<vertex> cur_node, bool is_local){
 }
 
 
-void cut_tunnel(shared_ptr<Path> path){
+int cut_tunnel(shared_ptr<Path> path){
   std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
   std::vector<int> vertex_indices_to_be_deleted;
 
@@ -389,26 +390,108 @@ void cut_tunnel(shared_ptr<Path> path){
   //cout << "deleted node index " << vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1] <<endl;
   int deleted_index = -1;
   if(vertex_indices_to_be_deleted.size() == 0){
-    return;
+    return -2;
   }
   if(path->get_endpoint_index() != vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]){ //endpoint doesn't have child, would crash program
     deleted_index = path->get_child_index(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
   } else {
-    return;
+    return -2;
   }
   shared_ptr<vertex> cur = path->get_node_pointer(vertex_indices_to_be_deleted[vertex_indices_to_be_deleted.size() - 1]);
 
   int prev = path->get_size();
-  cut_subtree_in_main_tree(path->get_node_pointer(deleted_index),false); //from element before the last
+  //cut_subtree_in_main_tree(path->get_node_pointer(deleted_index),false); //from element before the last
   path->erase_from_index(deleted_index);
+  return deleted_index;
   //cout << "path post " << prev - path->get_size() << endl;
   //exit(0);
   
 }
 
+bool search(shared_ptr<vertex> base, shared_ptr<vertex> target){
+
+    int frame_diference = target->get_first_frame() - base->get_first_frame();
+    double  direction_vector_length = compute_metric_eucleidean(target->get_location_coordinates(), base->get_location_coordinates());
+    int num_of_interpolated_steps = direction_vector_length / min_step;
+
+    if(direction_vector_length <= min_step){
+        return false;
+    }
+
+    double* increment_vector = create_direction_vector(base, target, min_step);
+
+    vector<vector<int>> matrix;
+    for(int i = 0; i < frame_diference; i++){
+      vector<int> matrix_row;
+      matrix.push_back(matrix_row);
+      for(int j = 0; j < num_of_interpolated_steps; j++){
+        matrix[i].push_back(-1);
+      }
+    }
+    cout << "gone"  << endl;
+    for(int i = 0; i < num_of_interpolated_steps; i++){
+        double* current_coordinates = add_vectors(base->get_location_coordinates(), increment_vector, ADDITION);
+        for(int j = 0; j < frame_diference; j++){
+            if(is_in_obstacle_custom_frame(current_coordinates, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, base->get_first_frame() + j)){
+                matrix[j][i] = 0;
+            }
+            else {
+                matrix[j][i] = 1;
+            } 
+        }
+        delete [] current_coordinates;
+    }
+   
+    queue <array<int, 2>> visited;
+    array<int, 2> cur = {0, 0};
+    visited.push(cur);
+
+    bool success = false;
+
+    int counter = 0;
+
+    while(visited.size() != 0){
+        if(cur[0] < frame_diference - 1){
+            if(matrix[cur[0] + 1][cur[1]] == 1){
+                if(cur[0] == num_of_interpolated_steps - 1 && cur[1] == frame_diference - 1){
+                    success = true;
+                    break;
+                }
+                array<int, 2> new_position = {cur[0] + 1, cur[1]};
+                visited.push(new_position);
+            }
+        }   
+
+        if(cur[0] < num_of_interpolated_steps - 1){
+            if(matrix[cur[0]][cur[1] + 1] == 1){
+                if(cur[0] == num_of_interpolated_steps - 1 && cur[1] == frame_diference - 1){
+                    success = true;
+                    break;
+                }
+                array<int, 2> new_position = {cur[0], cur[1] + 1};
+                visited.push(new_position);
+            }
+        }
+
+    cur = visited.front();
+    visited.pop();
+    counter++;
+    if(counter > 1000000){
+      cout << "STUCK" << endl;
+      create_segfault();
+    }
+
+    }
+
+    cout << "gone2"  << endl;
+    delete [] increment_vector;
+    return success;
+}
+
 
 
 bool delete_nodes_inbetween(shared_ptr<Path> path, shared_ptr<vertex> base, shared_ptr<vertex> target){
+  //means that there was time travel inbetwee
 
   double  direction_vector_length = compute_metric_eucleidean(target->get_location_coordinates(), base->get_location_coordinates());
  // cout << "direction vector length " << direction_vector_length << endl;
@@ -428,7 +511,7 @@ bool delete_nodes_inbetween(shared_ptr<Path> path, shared_ptr<vertex> base, shar
   while(compute_metric_eucleidean(target->get_location_coordinates(), new_position_prev) > min_step){
     new_position = add_vectors(new_position_prev, increment_vector, ADDITION);
     delete [] new_position_prev;
-    if(!is_in_obstacle(new_position, probe_radius, CHECK_WITH_BLOCKING_SPHERES)){
+    if(!is_in_obstacle_custom_frame(new_position, probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, base->get_first_frame())){
  //     cur = make_shared<vertex>(new_position, 0, probe_radius, get_current_frame(), true);
  //     interpolated_nodes.push_back(cur);
  //     cout << "distance " << compute_metric_eucleidean(target->get_location_coordinates(), new_position) <<endl;
@@ -463,6 +546,17 @@ bool delete_nodes_inbetween(shared_ptr<Path> path, shared_ptr<vertex> base, shar
   return true;
 }
 
+bool delete_nodes_inbetween_single(shared_ptr<Path> path, shared_ptr<vertex> base, shared_ptr<vertex> middle, shared_ptr<vertex> target){
+  if(base->get_first_frame() < target->get_first_frame()){
+    //cout << "IM HERE" << endl;
+    if(search(base, target)){
+      path->erase_node_with_reconnecting(middle->get_index());
+    }
+  } else {
+      delete_nodes_inbetween(path, base, target);
+  } 
+}
+
 double smoothing_vol2(shared_ptr<Path> path){
   int beginning_index = path->get_beginning_index(); 
   //cout << path.size() << endl;
@@ -481,7 +575,7 @@ double smoothing_vol2(shared_ptr<Path> path){
    //cout <<  "dist " << compute_metric_eucleidean(cur->get_location_coordinates(), child->get_location_coordinates()) <<endl;
    // cout <<  "param " << MAXIMUM_SMOOTHING_DISTANCE << endl;
     if(compute_metric_eucleidean(cur->get_location_coordinates(), child->get_location_coordinates()) < MAXIMUM_SMOOTHING_DISTANCE){
-      if(delete_nodes_inbetween(path, cur, child)){
+      if(delete_nodes_inbetween_single(path, cur, cur->get_child_pointer().lock(), child)){
         success_counter++; 
       }
     }  
@@ -508,6 +602,7 @@ void add_interpolated_node(shared_ptr<Path> path, shared_ptr<vertex> parent, sha
     path->add_node(cur);
 }
 
+/*
 void interpolate_nodes(shared_ptr<Path> path, shared_ptr<vertex> base, shared_ptr<vertex> target){
 
   double  direction_vector_length = compute_metric_eucleidean(base->get_location_coordinates(), target->get_location_coordinates());
@@ -575,7 +670,8 @@ void interpolate_nodes(shared_ptr<Path> path, shared_ptr<vertex> base, shared_pt
 //  cout << "NEW PATH SIZE " << path->get_vertices().size() << endl;
 //  cout << "STUFF " << child->get_index() << " " << target->get_index() << endl; 
 }
-
+*/
+/*
 void interpolate_smoothed_segments(shared_ptr<Path> path){
   if(path->get_size() < 2){
 //    cout << "TEST ERROR: interpolate_smoothed_segments: path has less than two nodes! " << endl;
@@ -595,9 +691,10 @@ void interpolate_smoothed_segments(shared_ptr<Path> path){
 //    cout << "ENDPOINT NOW " << path->get_endpoint_index() << endl;
   }
 }
+*/
 
 
-
+/*
 void smooth_tunnel(shared_ptr<Path> path){
   shared_ptr<vertex> cur = path->get_beginning_node();
   
@@ -635,11 +732,12 @@ void smooth_tunnel(shared_ptr<Path> path){
   interpolate_smoothed_segments(path);
   
 }
+*/
 
 
 
 
-void center_tunnel(shared_ptr<Path> path){
+int center_tunnel(shared_ptr<Path> path){
   //std::map<int, shared_ptr<vertex>>::iterator iterator;
 
   int counter = 0;
@@ -648,7 +746,7 @@ void center_tunnel(shared_ptr<Path> path){
   //std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
   // cout << "size " << path_vertices.size() << endl;
   //cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
-  if(path->get_size() < 2) return;
+  if(path->get_size() < 2) return -2;
 
   shared_ptr<vertex> cur_node = path->get_beginning_node()->get_child_pointer().lock();
   //shared_ptr<vertex> cur_node = path->get_endpoint_node();
@@ -682,7 +780,7 @@ void center_tunnel(shared_ptr<Path> path){
 
       if(cur_node->get_children_count() > 0){
         if(path->is_node_endpoint(cur_node)){
-          return;
+          return -2;
         }
         cur_node = cur_node->get_child_pointer_null_permisive().lock();
         if(cur_node == NULL){
@@ -742,19 +840,19 @@ void center_tunnel(shared_ptr<Path> path){
     */
 
     if(path->is_node_endpoint(cur_node)){
-      break;
+      return -2;
     }
 
     if(cur_node->get_radius() > test_sphere_radius){
       int child_index = cur_node->get_child_pointer().lock()->get_index();    
       if(child_index == -1){
           cerr << "your start position already lies in empty space!" << endl;
-          return;      
+          return -2;      
       }
-      cut_subtree_in_main_tree(path->get_node_pointer(child_index), false); 
+      //cut_subtree_in_main_tree(path->get_node_pointer(child_index), false); 
       path->erase_from_index(child_index);
-      //path->set_endpoint_index(cur_node->get_index()); 
-      break;}; //to_do
+      return child_index;
+  }; //to_do
 
     
     if(cur_node->get_children_count() > 0){
@@ -818,13 +916,13 @@ int path_optimization(shared_ptr<Path> path){
       create_segfault();
     }
 
-  center_tunnel(path);
- // cout << "path size aft_ctr " << path->get_size() << endl;
+  int delet_index_after_centering = center_tunnel(path);
+  //cout << "path size aft_ctr " << path->get_size() << endl;
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding opt_after_centr processing!" <<endl;
       create_segfault();
     }
-  cut_tunnel(path);
+  delet_index_after_centering = cut_tunnel(path);
   //cout << "path size aft_cut " << path->get_size() << endl;
 
   if(!test_path_noncolliding_static(path)){
@@ -837,7 +935,7 @@ int path_optimization(shared_ptr<Path> path){
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   tunnel_optimization_time += duration_cast<microseconds>( t2 - t1 ).count();
   
-  return 1;
+  return delet_index_after_centering;
   //cut_tunnel(path);
   //path = center_tunnel(path);
 }

@@ -17,7 +17,7 @@ void write_to_pdb(ofstream& file, std::map<int, shared_ptr<vertex>>& atoms){
       file << setprecision(3) << fixed;
       file << "ATOM";
 
-      file.width(7); file << iterator->second->get_frame_index();
+      file.width(7); file << iterator->second->get_first_frame();
       float c1 = 1;
       file << "  N   ILE E  16";
       file.width(12); file <<  iterator->second->get_location_coordinates()[0]; file.width(8); file <<  iterator->second->get_location_coordinates()[1]; file.width(8); file <<  iterator->second->get_location_coordinates()[2]; file.width(2); file.precision(2); file << "  "; file.width(4); file << c1;

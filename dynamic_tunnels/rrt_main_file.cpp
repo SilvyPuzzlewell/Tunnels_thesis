@@ -104,11 +104,12 @@ void add_cluster_path(shared_ptr<Path> added_path, int path_index){
 
 //obvious
 shared_ptr<vertex> load_parent_vertex_from_tree(shared_ptr<vertex> cur_vertex){
-  return cur_vertex->is_parent_local() ? local_priority_kdTree_coordinates->get_node_pointer(cur_vertex->get_parent_index()) : global_tree_points->get_node_pointer(cur_vertex->get_parent_index()); 
+  return local_priority_kdTree_coordinates->get_node_pointer(cur_vertex->get_parent_index());
 }
 
 //frame is valid if both tested node and it's child are valid in it and and the tested node's is same or smaller "is previous"
 //when locating parent node, we can't "travel into the future", the node should be in the same or older frame than the actual. If it is valid in more than one,obviously the most recent is used.
+/*
 int find_valid_frame(shared_ptr<vertex> cur, shared_ptr<vertex> child){
   int nearest_frame = child->get_frame_index();
   //cout << "nearest frame " << nearest_frame << endl;
@@ -122,62 +123,56 @@ int find_valid_frame(shared_ptr<vertex> cur, shared_ptr<vertex> child){
   }
   return -1;
 }
+*/
 
 //sets node into already found frame, deletes all children other than child in path, returns pointer to node added to path
 //deletes other children pointers so the path has only the path child, 
-shared_ptr<vertex> copy_node_tree_to_path(shared_ptr<Path> path, shared_ptr<vertex> tree_node, shared_ptr<vertex> path_child_node, int cur_frame){
+shared_ptr<vertex> copy_node_tree_to_path(shared_ptr<Path> path, shared_ptr<vertex> parent_tree_node, shared_ptr<vertex> child_node, int child_first_frame){
 
 
-  shared_ptr<vertex> path_cur_node = tree_node->copy_without_structure_pointers();
-  //cout << "COUNT 1 " << path_cur_node.use_count() << endl;
-  path_cur_node->set_frame_index(cur_frame);
-  path_cur_node->add_child_pointer(path_child_node, false);
-  path_child_node->set_parent_pointer(path_cur_node);
-  //cout << "COUNT 2 " << path_cur_node.use_count() << endl;
-  path->add_node(path_cur_node);
-  //cout << "COUNT 3 " << path_cur_node.use_count() << endl;
+  shared_ptr<vertex> parent_cur_node = parent_tree_node->copy_without_structure_pointers();
+  parent_cur_node->set_last_valid_frame(child_first_frame);
+  parent_cur_node->add_child_pointer(child_node, false);
+  child_node->set_parent_pointer(parent_cur_node);
+  path->add_node(parent_cur_node);
 
-
-
-  return path_cur_node;
+  return parent_cur_node;
 }
 
 //creates a copy of vertices involved in path from found endpoint to initial point, the path must be copied in case that it's part is deleted
 shared_ptr<Path> backtrack(shared_ptr<vertex> endpoint){ 
   shared_ptr<Path> path = make_shared<Path>(-1, endpoint->get_index(), get_current_frame());
-
-
   shared_ptr<vertex> cur = load_parent_vertex_from_tree(endpoint);
-  //cout << "Tree: backtrack: parent index " << endpoint->get_parent_index() << endl;
+
+  //cout << "cur index " << cur->get_index() << endl;
+  //cout << "cur frame " << cur->get_last_valid_frame() << endl;
 
   if(cur->get_last_valid_frame() != endpoint->get_last_valid_frame()) {cerr << "error in backtrack, endpoint and it's parents last frames doesn't match! " << endl; exit(0);} //these are more for testing, shoudn't happen
   if(endpoint->get_last_valid_frame() != get_current_frame()) {cerr << "error in backtrack, endpoint isn't in current frame! " << endl; exit(0);}
   if(endpoint->get_children_count() > 0) {cerr << "error in backtrack, endpoint has children! " << endl; exit(0);}
 
   shared_ptr<vertex> endpoint_copied = endpoint->copy_without_structure_pointers(); //
-  endpoint_copied->set_frame_index(get_current_frame());
   path->add_node(endpoint_copied);
 
-  shared_ptr<vertex> child_pointer = copy_node_tree_to_path(path, cur, endpoint_copied, get_current_frame());
+  shared_ptr<vertex> child_pointer = copy_node_tree_to_path(path, cur, endpoint_copied, endpoint_copied->get_first_frame());
   
 
   while(cur->get_parent_index() != -1){ //cur is previous node from the tree
     cur = load_parent_vertex_from_tree(cur);
-    //cout << "backtrack: parent index " << cur->get_parent_index() << endl;
+    int child_first_frame = child_pointer->get_first_frame();
+    //sanity check
+    if(!cur->is_valid_in_frame(child_first_frame)){
+      cout << "rrt_main_file.cpp, backtrack, insane " << endl;
+      create_segfault();
+    }
+    child_pointer = copy_node_tree_to_path(path, cur, child_pointer, child_pointer->get_first_frame());
+/*
+    cout << "index " << child_pointer->get_index() << endl;
+    cout << "first frame " <<  child_pointer->get_first_frame() << endl;
+    cout << "last frame " <<  child_pointer->get_last_valid_frame() << endl;
+    cout << "inactive " <<  child_pointer->is_inactive() << endl;
+*/
 
-    int nearest_frame = find_valid_frame(cur, child_pointer);
-    
-    if(nearest_frame > child_pointer->get_frame_index()){
-      //cout << "backtrack_frame cur " << nearest_frame << endl;
-      //cout << "backtrack_frame prev " << child_pointer->get_frame_index() << endl;
-      //cout << "backtrack fail, time travel not allowed!" << endl;
-    }
-    if(nearest_frame == -1){            //there is no previous frame, therefore you would have time travel to past to go through this path
-      cerr << "found null frame in path " << endl; //SHOULDN'T HAPPEN!
-      sleep(10);
-      return NULL;
-    }
-    child_pointer = copy_node_tree_to_path(path, cur, child_pointer, nearest_frame);
   }
   path->set_beginning_index(cur->get_index()); 
   return path;
@@ -189,7 +184,7 @@ void init_start(){
   build_tree(LOCAL);
   local_priority_kdTree_coordinates = new Tree();
   double location_coordinates[3] = {qix, qiy, qiz};
-  shared_ptr<vertex> start = make_shared<vertex>(location_coordinates, 0, probe_radius, get_current_frame(), true);
+  shared_ptr<vertex> start = make_shared<vertex>(location_coordinates, 0, probe_radius, get_current_frame(), get_current_frame(), true);
   local_priority_kdTree_coordinates->add_node(start);
   
   tree_index = 0;  //use as a static variable in tree::add_node;
@@ -272,7 +267,7 @@ bool add_node(shared_ptr<vertex> nearest_neighbor, shared_ptr<vertex> new_vertex
     return true;
 }
 
-//kDtree_passed - kDtree in which the nearest point is looked for, global ??
+
 void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_coords, Tree* parent_tree, bool global, bool output){
   if(output){
     cout << "global " << global << " frame " << get_current_frame() << endl;
@@ -285,7 +280,7 @@ void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_co
   //cout << "tree size " << parent_tree->get_size() << endl;
   int parent_index = find_nearest_vertex(sampled_coords, kDtree_passed);
   shared_ptr<vertex> parent = parent_tree->get_node_pointer(parent_index); //indices mapping is kept 1:1
-  shared_ptr<vertex> new_vertex = make_shared<vertex>(sampled_coords, parent,tree_index, probe_radius, get_current_frame(), true);
+  shared_ptr<vertex> new_vertex = make_shared<vertex>(sampled_coords, parent,tree_index, probe_radius, get_current_frame(),get_current_frame(), true);
   //todo - redo so it adds stuff to the trees in the step function, interpolation can lead to different scenarios with one or more new nodes
   step_interpolated(new_vertex, parent, MAX_STEP_DISTANCE, min_step, parent_index);
        //function for adding next point to graph points and sending signals to end iterating, use whichever you want                                                                                     //new_vertex is expected to be deleted if step_success_flag is set false, new vertex is added to                                                                                                     //both local and global coordinate representation, and only to local kd tree, the local kd tree is kept because o                                                                                      //the need to track local kd tree when deleting parts of it  
@@ -310,13 +305,7 @@ void find_path(ofstream* stats_filename){
     double* sampled_coords = sample(i);
     if(is_local_tree_initialized){
       try_add_new_point(local_priority_kdTree, sampled_coords, local_priority_kdTree_coordinates, false, false);
-      }
-    if(LOCALIZED_MODE && get_current_frame() > 1 && (!step_success_flag || !is_local_tree_initialized)){
-      try_add_new_point(global_kdTree, sampled_coords, global_tree_points, true, false);
-      if(step_success_flag){
-        is_local_tree_initialized = true;
-      }
-    }                                                                                     //the need to track local kd tree when deleting parts of it
+    }                                                                                   //the need to track local kd tree when deleting parts of it
     delete [] sampled_coords;
 
     if(is_finished){ //allows to implement another ending condition then just "running out of iterations", currently not implemented
@@ -325,7 +314,7 @@ void find_path(ofstream* stats_filename){
    }
 }  
 
-
+//for brute force approach
 bool path_check(std::map<int, shared_ptr<vertex>>& tested_path, std::map<int, shared_ptr<vertex>>& reference_path){
   double distances_sum = 0;
   double tested_path_length = 0;
@@ -387,14 +376,23 @@ int is_duplicated(shared_ptr<Path> tested__path){
 } 
 
 
-void add_blocking_sphere(double* coordinates, double radius){
-  static int blocking_spheres_counter = 0;
- //shared_ptr<vertex> blocking_sphere = make_shared<vertex>(coordinates, 0, radius, get_current_frame(), true); //don't care about index
- // blocking_spheres_in_vertices.insert(std::pair<int,shared_ptr<vertex>>(blocking_spheres_counter,blocking_sphere));
- //blocking_spheres_counter++;
+void add_blocking_sphere(double* coordinates, double radius, shared_ptr<Path> path){
  rebuild_blocking_spheres_structure(coordinates, radius);
- 
 
+ shared_ptr<vertex> endpoint = local_priority_kdTree_coordinates->get_node_pointer(path->get_endpoint_index());
+ //---delete invalidated tree part
+ while(true){
+  //parent 
+  shared_ptr<vertex> parent = local_priority_kdTree_coordinates->get_node_pointer(local_priority_kdTree_coordinates->get_parent_index(endpoint->get_index()));
+  //check
+  if(!is_in_obstacle(parent->get_location_coordinates(), probe_radius, CHECK_ONLY_BLOCKING_SPHERES) || parent->get_index() == 0){
+    break;
+  }
+  //new run 
+  endpoint = parent;
+ }
+ cut_subtree_in_main_tree(endpoint, false);
+ //--- 
 }
 
 void label_path_nodes(shared_ptr<Path> path, int path_index){
@@ -467,6 +465,7 @@ shared_ptr<vertex> step(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neares
   return new_vertex;
 }
 
+//use simpler way
 array<double, 3> move_in_direction(double distance, double alfa, double beta, int kx, int ky, int kz, array<double, 3> old_coordinates){
   double new_x = old_coordinates[0] - kx * cos(alfa) * cos(beta) * distance;
   double new_y = old_coordinates[1] - ky * cos(alfa) * sin(beta) * distance;
@@ -494,7 +493,7 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
 
     if(!(is_in_obstacle(new_coordinates, probe_radius, CHECK_WITH_BLOCKING_SPHERES))){
       double* coords = copy_array_to_coordinate_pointer(new_coordinates);
-      interpolated_nodes.push_back(make_shared<vertex>(coords, 0, probe_radius, get_current_frame(), true));
+      interpolated_nodes.push_back(make_shared<vertex>(coords, 0, probe_radius, get_current_frame(), get_current_frame(), true));
       delete [] coords;
       if(is_new_first_valid){
         first_valid = interpolated_nodes.size() - 1;
@@ -564,8 +563,11 @@ void interpolate_segment(shared_ptr<vertex> new_vertex, shared_ptr<vertex> neare
   }
   step_success_flag = true;
 }
+
+
 //new version
 //parameters - interpolation_step, max_step
+//rewrite this for fucks sake, it's stupidly complicated for such a simple thing
 void step_interpolated(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest_neighbor_vertex, double max_step, 
   double interpolation_step, int parent_index){
  // print_vertex_coordinates(destination);
@@ -602,14 +604,7 @@ void step_interpolated(shared_ptr<vertex> new_vertex, shared_ptr<vertex> nearest
     interpolate_segment(new_vertex, nearest_neighbor_vertex, min_step, alfa, beta, kx, ky, kz);
   }
 }
-  //all shit is put into local kdtree first, and on frame change the global tree is reconstructed from rrt
-  /*
-  add_to_tree(new_vertex->location_coordinates, tree_index, local_priority_kdTree); //all shit is put in local tree first, and on frame change
   
-  tree_index++;
-  
-	if(termination_check(new_vertex->location_coordinates))
-  */
 
 void add_to_path_count(int path){
   if(!path_found_in_frame[path]){
@@ -624,7 +619,7 @@ void restart(){
   build_tree(LOCAL);
   local_priority_kdTree_coordinates = new Tree();
   double location_coordinates[3] = {qix, qiy, qiz};
-  shared_ptr<vertex> start = make_shared<vertex>(location_coordinates, 0, probe_radius, get_current_frame(), true);
+  shared_ptr<vertex> start = make_shared<vertex>(location_coordinates, 0, probe_radius, get_current_frame(), get_current_frame(), true);
   local_priority_kdTree_coordinates->add_node(start);
   
   tree_index = 0;  //use as a static variable in tree::add_node;
@@ -641,22 +636,9 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
       return;
     }
 
-    path_optimization(path);
+    int last_index = path_optimization(path);
     int is_duplicate = is_duplicated(path);
-
     bool add_sphere;
-       
-    //---finds strongly centered version of endpoint index, it's radius and coordinates
-    /*
-    std::map<int, shared_ptr<vertex>>& path_vertices = path->get_vertices();
-    double* direction_vector = add_vectors(path_vertices[path->ending_index]->location_coordinates, path_vertices[path->get_parent_index(path->ending_index)]->location_coordinates, SUBTRACTION);
-    double* centered_node_info = center_node(path->get_node_pointer(path->ending_index), NULL, NULL, direction_vector, test_sphere_radius, false, false, true); delete [] direction_vector;
-    double* location_coordinates = new double[3]; location_coordinates[0] = centered_node_info[0]; location_coordinates[1] = centered_node_info[1]; location_coordinates[2] = centered_node_info[2];
-    double blocking_sphere_radius = centered_node_info[3];
-    delete [] centered_node_info;
-    */
-    //---
-
     double* location_coordinates = path->get_node_pointer(path->get_endpoint_index())->get_location_coordinates();
     double blocking_sphere_radius = path->get_node_pointer(path->get_endpoint_index())->get_radius();
 
@@ -679,13 +661,13 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
 
 
     if(is_duplicate == -1){
-     add_blocking_sphere(location_coordinates, blocking_sphere_radius);
+     add_blocking_sphere(location_coordinates, blocking_sphere_radius, path);
     } else {
       if(0.2*duplicate_count[is_duplicate] < maximum_increase){
-        add_blocking_sphere(location_coordinates, (0.2*duplicate_count[is_duplicate] + 1) * blocking_sphere_radius);
+        add_blocking_sphere(location_coordinates, (0.2*duplicate_count[is_duplicate] + 1) * blocking_sphere_radius, path);
       }
       else {
-        add_blocking_sphere(location_coordinates, (maximum_increase) * blocking_sphere_radius);
+        add_blocking_sphere(location_coordinates, (maximum_increase) * blocking_sphere_radius, path);
       }
     }
 
@@ -694,89 +676,36 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
     } 
 	}
 
-void print_vertex_coordinates(shared_ptr<vertex> vert){
-	std::cout <<"printing vertex location coordinates: x: " << vert->get_location_coordinates()[0] << " y: " << vert->get_location_coordinates()[1] << " z : " << vert->get_location_coordinates()[2] << endl 
-	<< "parent_index: " << vert->get_parent_index() << endl;
-}
-
-void copy_to_global(){
-  for(std::map<int, shared_ptr<vertex>>::iterator iterator = local_priority_kdTree_coordinates->get_vertices().begin(); iterator != local_priority_kdTree_coordinates->get_vertices().end(); iterator++){
-    global_tree_points->add_node(iterator->second);
-    iterator->second->make_global();
-  }
-  for(int i = 0; i < paths.size(); i++){
-    for(std::map<int, shared_ptr<vertex>>::iterator iterator = paths[i]->get_vertices().begin(); iterator != paths[i]->get_vertices().end(); iterator++){
-      iterator->second->make_global();
-    }
-  }
-}
-
-
 
 MPNN::MultiANN<double>* new_frame_initalisation(){
-  if(get_current_frame() == 1 && LOCALIZED_MODE){
-    global_tree_points = new Tree();
-  }
-
-
+  
+  //*for clustering
   //marks all paths as not found in new frame, therefore they can be added to counts of the same path in new frame if found again
   for (int i = 0; i < path_found_in_frame.size(); ++i) {
     path_found_in_frame[i] = false;
   }
+
   run_next_frame(); //switches frame number and loads next coordinate structure
-  if(LOCALIZED_MODE){
-    copy_to_global();
-    local_priority_kdTree_coordinates->reset(); //deletes storage for nodes in previous local tree
-  }
-  //checks which vertices from the old frame are not colliding in current frame, marks them as valid ones
 
-  if(LOCALIZED_MODE){
-    for (map<int, shared_ptr<vertex>>::iterator iterator = global_tree_points->get_vertices().begin(); iterator != global_tree_points->get_vertices().end(); iterator++){
-      if(!is_in_obstacle(iterator->second->get_location_coordinates(), probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
-        iterator->second->add_valid_frame(get_current_frame());
-      }
-    }
-  } else {
-    for (map<int, shared_ptr<vertex>>::iterator iterator = local_priority_kdTree_coordinates->get_vertices().begin(); iterator != local_priority_kdTree_coordinates->get_vertices().end(); iterator++){
-      if(!is_in_obstacle(iterator->second->get_location_coordinates(), probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
-        iterator->second->add_valid_frame(get_current_frame());
-      }
-    }
-  }
-  int i = 1;
-  //checks endpoints of paths, if they are valid in current frame. If succeeds, the path is automatically valid in this frame too, cause it
-  //always possible to connect it to previous' frame's one
-  for (vector<shared_ptr<Path>>::iterator iterator = paths.begin(); iterator != paths.end(); iterator++){
-    if(!is_in_obstacle((*iterator)->get_node_coordinates((*iterator)->get_endpoint_index()), test_sphere_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
-      (*iterator)->add_valid_frame(get_current_frame());
-      add_blocking_sphere((*iterator)->get_node_coordinates((*iterator)->get_endpoint_index()), (*iterator)->get_node_pointer((*iterator)->get_endpoint_index())->get_radius()); //to:do save in vector instead and rebuild it only once!, lazy and tired now
-      add_to_path_count(i - 1);
+  for (map<int, shared_ptr<vertex>>::iterator iterator = local_priority_kdTree_coordinates->get_vertices().begin(); iterator != local_priority_kdTree_coordinates->get_vertices().end(); iterator++){
+    shared_ptr<vertex> cur = iterator->second;
+    //use another data structure for inactives to avoid unncessary checks
+    if(!cur->is_inactive() && !is_in_obstacle(cur->get_location_coordinates(), probe_radius, DONT_CHECK_WITH_BLOCKING_SPHERES)){
+      iterator->second->set_last_valid_frame(get_current_frame());
     } else {
-      //cout << "path " << i << " is invalid in frame " << get_current_frame() << endl;
+      iterator->second->set_inactive(true);
     }
-    i++;
-  }
-  //first frame doesn't have priority tree, therefore it is not needed to delete it in second frame
-  //first bool labels. whether old kd_tree exists, and hence is delet, second which kd_tree is rebuilded, and third whether it's corresponding sturcuture is copied into it
-  //locals are not rebuilded, all points in them are copied into new globals 
-  if(get_current_frame() == 2 && LOCALIZED_MODE){
-    rebuild_kd_tree(false, GLOBAL, true, false);
-  } else if(LOCALIZED_MODE) {
-    rebuild_kd_tree(true, GLOBAL, true, false);
+    /*
+    cout << "index " << iterator->second->get_index() << endl;
+    cout << "first frame " << iterator->second->get_first_frame() << endl;
+    cout << "last frame " << iterator->second->get_last_valid_frame() << endl;
+    cout << "inactive " << iterator->second->is_inactive() << endl;
+  */
   }
 
-  if(LOCALIZED_MODE){
-    rebuild_kd_tree(true, LOCAL, false, false);                //deletes last frame's priority tree
-    is_local_tree_initialized = false;
-  }
-  if(!LOCALIZED_MODE){
-    cout << "kd_tree before " << local_priority_kdTree->size << endl;
-    rebuild_kd_tree(true, LOCAL, true, true);                  //builds new kd tree without invalid nodes in current frame
-    cout << "kd_tree after " << local_priority_kdTree->size << endl;
-
-  }
-
-     //init priority tree for current frame
+  //cout << "kd_tree before " << local_priority_kdTree->size << endl;
+  rebuild_kd_tree(true, LOCAL, true, true);                  //builds new kd tree without invalid nodes in current frame
+  //cout << "kd_tree after " << local_priority_kdTree->size << endl;
 }
 
 
