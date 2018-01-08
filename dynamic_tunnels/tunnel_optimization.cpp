@@ -15,6 +15,9 @@ using namespace std::chrono;
 double SMOOTHING_SUCCESS_THRESHOLD = 5;
 double MAXIMUM_SMOOTHING_DISTANCE = 0.8;
 
+bool IS_INBETWEEN_CENTERING_ENABLED = true;
+
+
 
 
 
@@ -27,7 +30,7 @@ centering. Function returns new node without deleting the original, so the user 
 Function firslty finds plane perpendicular to supplied direction vector, using two perpendicular vectors to it and then performs "gradient descent" trying to move the node in the plane in attempt
 to find the maximum possible radius to fit inside the tunnel. 
 */
-double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previous_node, shared_ptr<vertex> next_node, double* coordinate_vector, double increment, bool are_neighbors_centered, bool rewrite_node, bool return_node_info){
+double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previous_node, shared_ptr<vertex> next_node, double* coordinate_vector, double increment, bool are_neighbors_centered, bool rewrite_node, bool return_node_info, int frame){
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
   //sanity check
@@ -87,7 +90,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
   //cout << "first " << endl;
 
   
-  double cur_radius = approximate_radius_custom_frame(node_coordinates, centered_node->get_radius(), 0.01, 0.1, centered_node->get_first_frame());
+  double cur_radius = approximate_radius_custom_frame(node_coordinates, centered_node->get_radius(), 0.01, 0.1, frame);
   //sanity check
   if(get_current_frame() == 2){
     //cout << "index " << centered_node->get_index() << endl;
@@ -103,7 +106,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
     create_segfault();
   }
   //sanity check
-  if(is_in_obstacle_custom_frame(node_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
+  if(is_in_obstacle_custom_frame(node_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, frame)){
     cout << "cur_radius_colliding pre" << endl;
     create_segfault();
   }
@@ -153,7 +156,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
       double* shifted_coordinates = add_vectors(shift_vector, node_coordinates, ADDITION);
 
       //... and maximum radius of ball in that placement is found, nodes with smaller than the largest last radius should be automatically discarded here
-      cur_radius = approximate_radius_custom_frame(shifted_coordinates, last_valid_radius, 0.01, 0.1, centered_node->get_first_frame());
+      cur_radius = approximate_radius_custom_frame(shifted_coordinates, last_valid_radius, 0.01, 0.1, frame);
       //node is colliding
       if(cur_radius == 0){
         delete [] cur_perpendicular_vector; delete [] cur_second_perpendicular_vector; delete [] shift_vector; delete [] shifted_coordinates; 
@@ -161,13 +164,13 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
       }
       
       //sanity check
-      if(is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
+      if(is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, frame)){
         cout << "cur_radius_colliding" <<endl;
         create_segfault();
       }
       //maximum radius in this position is checked subtracted from maximum radius found in previous iteration and checked against the maximum increase found in current iteration, which starts at zero,
       //therefore the new maximum radius must be greater than the previous one
-      if((cur_radius - check_radius) > max_increase && !is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())) {
+      if((cur_radius - check_radius) > max_increase && !is_in_obstacle_custom_frame(shifted_coordinates, cur_radius, DONT_CHECK_WITH_BLOCKING_SPHERES, frame)) {
         
         //cout << "sanity check " << are_neighbors_centered << endl;
         //--- can be buggy, check later
@@ -255,7 +258,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
 
   if(!return_node_info){ //this is because we don't always want to allocate new memory
     delete [] node_coordinates;
-    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
+    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, frame)){
       cout << "centered node colliding!" <<endl;
       create_segfault();
     }
@@ -268,7 +271,7 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
     double* ret = new double[4];
     ret[0] = node_coordinates[0]; ret[1] = node_coordinates[1]; ret[2] = node_coordinates[2]; ret[3] = cur_radius;
     delete [] node_coordinates;
-    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, centered_node->get_first_frame())){
+    if(is_in_obstacle_custom_frame(centered_node->get_location_coordinates(), centered_node->get_radius(), DONT_CHECK_WITH_BLOCKING_SPHERES, frame)){
       cout << "centered node colliding!" <<endl;
       create_segfault();
     } 
@@ -281,6 +284,35 @@ double* center_node(shared_ptr<vertex> centered_node, shared_ptr<vertex> previou
   //std::cout<< cur_radius << endl;
 }
 
+bool center_node_dynamic_delegate(shared_ptr<vertex> centered_node, shared_ptr<vertex> previous_node, shared_ptr<vertex> next_node, double* coordinate_vector, double increment, bool are_neighbors_centered, bool rewrite_node, bool return_node_info){
+ 
+  int cur_frame = centered_node->get_first_frame();
+  double bottleneck = DBL_MAX;
+  do{
+    centered_node->set_radius(probe_radius);
+    double* node_information = center_node(centered_node, previous_node, next_node, coordinate_vector, increment, are_neighbors_centered,
+    rewrite_node, true, cur_frame);
+
+    //signal outside of the protein
+    if(node_information[3] > test_sphere_radius){
+      cout << "delet " << node_information[3] << endl;
+      delete [] node_information;
+      return true;
+    }
+    if(node_information[3] < bottleneck){
+      bottleneck = node_information[3];
+    }
+    delete [] node_information;
+    cout << "cur frame " << cur_frame <<  "  " <<centered_node->get_index() << endl;
+    cur_frame++;
+  }
+  while(cur_frame != centered_node->get_last_valid_frame() + 1);
+  if(rewrite_node){
+    centered_node->set_radius(bottleneck);
+  }
+
+  return false;     
+} 
 
 void smoothing(shared_ptr<Path> path){
   int i = 0;
@@ -373,13 +405,12 @@ int cut_tunnel(shared_ptr<Path> path){
     //cout << "cut tunnel indices " << endpoint_index << " " << endpoint_parent_index << endl;
     //cout << "cut tunnel " << path_vertices[endpoint_index]->index << " " << path_vertices[endpoint_parent_index]->index << " " << local_priority_kdTree_coordinates[endpoint_index]->is_in_path()<< endl;
     double* direction_vector = add_vectors(path_vertices[endpoint_index]->get_location_coordinates(), path_vertices[endpoint_parent_index]->get_location_coordinates(), SUBTRACTION);
-    double* node_information = center_node(path_vertices[endpoint_index], NULL, NULL, direction_vector, test_sphere_radius / 2, false, false, true);
-    if(node_information [3] > test_sphere_radius){      
+    bool is_cut = center_node_dynamic_delegate(path_vertices[endpoint_index], NULL, NULL, direction_vector, test_sphere_radius / 2, false, false, true);
+    if(is_cut){      
       vertex_indices_to_be_deleted.push_back(endpoint_index);
     } 
 
     delete [] direction_vector;
-    delete [] node_information;
 
     endpoint_index = path->get_parent_index(endpoint_index);
     endpoint_parent_index = path->get_parent_index(endpoint_index);
@@ -809,27 +840,9 @@ int center_tunnel(shared_ptr<Path> path){
     
 
     
-    if(child_node != NULL){
-      
-      if(isnan(cur_node->get_location_coordinates()[0])){
-        create_segfault();
-      }
-      center_node(cur_node, parent_node, child_node, direction_vector, 0.5, false, true, false);
-      if(isnan(cur_node->get_location_coordinates()[0])){
-        create_segfault();
-      }
-
-
-    } else {
-      if(isnan(cur_node->get_location_coordinates()[0])){
-        create_segfault();
-      }
-      center_node(cur_node, parent_node , NULL, direction_vector, 0.5, false, true, false);
-      if(isnan(cur_node->get_location_coordinates()[0])){
-        create_segfault();
-      }
-    }
-
+    
+    bool deleted = center_node_dynamic_delegate(cur_node, NULL , NULL, direction_vector, 0.5, false, true, false);
+    
     delete [] direction_vector;
     
     /* deleting subtrees is important because of path blocking. Blocking sphere needs to be placed in the center of the tunnel at it's endpoint
@@ -843,7 +856,7 @@ int center_tunnel(shared_ptr<Path> path){
       return -2;
     }
 
-    if(cur_node->get_radius() > test_sphere_radius){
+    if(deleted){
       int child_index = cur_node->get_child_pointer().lock()->get_index();    
       if(child_index == -1){
           cerr << "your start position already lies in empty space!" << endl;
@@ -867,41 +880,6 @@ int center_tunnel(shared_ptr<Path> path){
    
 }
 
-void center_tunnel_without_erasing(shared_ptr<Path> path){
-
-  if(path->get_size() < 2) return;
-  shared_ptr<vertex> cur = path->get_beginning_node()->get_child_pointer().lock();
-  shared_ptr<vertex> parent = NULL;
-  shared_ptr<vertex> child = NULL;
-
-  //cout << "size " << path_vertices.size() << endl;
-  //cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
-  while(true){  
-    /*
-    With reused tree, that already centered node is inside some previous trajectory. Therefore instead of costy centering procedure it can just be copied from that path.
-    exists_in_path() method returns -1 if the node is new. else it returns index into path in paths vector.
-    Important - node must be valide in the same frame as current node, because molecular positions are different in every frame!
-    Duplicated paths are deleted, therefore we must be sure to not index into them, this is achieved by calling the "labeling" function, which points the nodes in main data structures
-    into valid paths, when the path is added into main paths vector 
-    */
-
-    bool is_endpoint = false;
-    parent = cur->get_parent_pointer().lock();
-    if(cur->get_index() == path->get_endpoint_index()) is_endpoint = true;
-    if(!is_endpoint) child = cur->get_child_pointer().lock();
-
-    double* direction_vector = add_vectors(cur->get_location_coordinates(), parent->get_location_coordinates(), SUBTRACTION);
-  
-    //if(!is_endpoint) cout << "child_node " << child->get_index() << endl;
-    center_node(cur, parent, child, direction_vector, 1, false, true, false);
-    delete [] direction_vector;
-    if(is_endpoint){
-      break;
-    }
-
-    cur = child;
-  }
-}
 
 
 
