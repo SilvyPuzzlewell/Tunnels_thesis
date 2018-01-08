@@ -270,8 +270,8 @@ bool add_node(shared_ptr<vertex> nearest_neighbor, shared_ptr<vertex> new_vertex
 
 void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_coords, Tree* parent_tree, bool global, bool output){
   if(output){
-    cout << "global " << global << " frame " << get_current_frame() << endl;
-    cout << "it's size " << kDtree_passed->size << endl;
+    //cout << "global " << global << " frame " << get_current_frame() << endl;
+    //cout << "it's size " << kDtree_passed->size << endl;
   }
 
   static int counter = 0;
@@ -288,7 +288,7 @@ void try_add_new_point(MPNN::MultiANN<double>* kDtree_passed, double* sampled_co
     if(get_current_frame() > 1){
       //should be valid always, so added into TEST case
       if(TESTING_ENABLED){
-        if(!parent->is_valid_in_frame(get_current_frame())){
+        if(parent->get_last_valid_frame() != get_current_frame()){
           cout << "TEST ERROR: STEP: parent not valid in current frame!" <<endl;
           exit(0);
         }
@@ -376,22 +376,49 @@ int is_duplicated(shared_ptr<Path> tested__path){
 } 
 
 
-void add_blocking_sphere(double* coordinates, double radius, shared_ptr<Path> path){
- rebuild_blocking_spheres_structure(coordinates, radius);
 
- shared_ptr<vertex> endpoint = local_priority_kdTree_coordinates->get_node_pointer(path->get_endpoint_index());
- //---delete invalidated tree part
- while(true){
-  //parent 
-  shared_ptr<vertex> parent = local_priority_kdTree_coordinates->get_node_pointer(local_priority_kdTree_coordinates->get_parent_index(endpoint->get_index()));
-  //check
-  if(!is_in_obstacle(parent->get_location_coordinates(), probe_radius, CHECK_ONLY_BLOCKING_SPHERES) || parent->get_index() == 0){
-    break;
-  }
-  //new run 
-  endpoint = parent;
- }
- cut_subtree_in_main_tree(endpoint, false);
+double test = 0;
+void add_blocking_sphere(double* coordinates, double radius, shared_ptr<Path> path){
+  
+  shared_ptr<vertex> endpoint = local_priority_kdTree_coordinates->get_node_pointer(path->get_endpoint_index());
+  rebuild_blocking_spheres_structure(coordinates, radius); 
+ //---delete invalidated tree part 
+ while(true){ 
+  //parent  
+  shared_ptr<vertex> parent = local_priority_kdTree_coordinates->get_node_pointer(local_priority_kdTree_coordinates->get_parent_index(endpoint->get_index())); 
+  //check 
+  if(!is_in_obstacle(parent->get_location_coordinates(), probe_radius, CHECK_ONLY_BLOCKING_SPHERES) || parent->get_index() == 0){ 
+    break; 
+  } 
+  //new run  
+  endpoint = parent; 
+ } 
+ cut_subtree_in_main_tree(endpoint, false, true);
+
+
+
+
+  //print_vector(coordinates);
+  //out << "radius " << radius << endl;
+ //cout << "dist " << compute_metric_eucleidean(path->get_beginning_node()->get_location_coordinates(), coordinates) << endl;
+ 
+
+ //static int counter_post = 0;
+ //static int counter_pre = 0;
+ //cout << endl << "before " << local_priority_kdTree_coordinates->get_size() << endl;
+ //counter_pre += print_colliding(local_priority_kdTree_coordinates->get_vertices());
+ //cout << RESETED_TREE_MODE << endl;
+ high_resolution_clock::time_point t1 = high_resolution_clock::now(); 
+ //if(!RESETED_TREE_MODE) purge_nodes_in_blocking_spheres(path);
+ high_resolution_clock::time_point t2 = high_resolution_clock::now();
+ test += duration_cast<microseconds>( t2 - t1 ).count(); 
+
+ //cout << "after " << local_priority_kdTree_coordinates->get_size() << endl << endl;
+ //counter_post += print_colliding(local_priority_kdTree_coordinates->get_vertices());
+ //cout << "pre count " << counter_pre << endl;
+ //cout << "post count " << counter_post << endl;
+ //cout << "end " << endl << endl;
+ //cout << "test " << test << endl;
  //--- 
 }
 
@@ -641,6 +668,7 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
     bool add_sphere;
     double* location_coordinates = path->get_node_pointer(path->get_endpoint_index())->get_location_coordinates();
     double blocking_sphere_radius = path->get_node_pointer(path->get_endpoint_index())->get_radius();
+    //cout << "block " << blocking_sphere_radius << endl;
 
     if(is_duplicate == -1){
       paths.push_back(path);
@@ -658,19 +686,17 @@ void backtrack_process_path(shared_ptr<vertex> new_vertex ) {
       add_sphere = true;     
     }
 
-
-
-    if(is_duplicate == -1){
-     add_blocking_sphere(location_coordinates, blocking_sphere_radius, path);
-    } else {
-      if(0.2*duplicate_count[is_duplicate] < maximum_increase){
-        add_blocking_sphere(location_coordinates, (0.2*duplicate_count[is_duplicate] + 1) * blocking_sphere_radius, path);
-      }
-      else {
-        add_blocking_sphere(location_coordinates, (maximum_increase) * blocking_sphere_radius, path);
-      }
-    }
-
+    if(is_duplicate == -1){ 
+     add_blocking_sphere(location_coordinates, blocking_sphere_radius, path); 
+    } else { 
+      if(0.2*duplicate_count[is_duplicate] < maximum_increase){ 
+        add_blocking_sphere(location_coordinates, (0.2*duplicate_count[is_duplicate] + 1) * blocking_sphere_radius, path); 
+      } 
+      else { 
+        add_blocking_sphere(location_coordinates, (maximum_increase) * blocking_sphere_radius, path); 
+      } 
+    } 
+ 
     if(RESETED_TREE_MODE){
       restart();
     } 
@@ -704,7 +730,7 @@ MPNN::MultiANN<double>* new_frame_initalisation(){
   }
 
   //cout << "kd_tree before " << local_priority_kdTree->size << endl;
-  rebuild_kd_tree(true, LOCAL, true, true);                  //builds new kd tree without invalid nodes in current frame
+  rebuild_kd_tree(true, true, true);                  //builds new kd tree without invalid nodes in current frame
   //cout << "kd_tree after " << local_priority_kdTree->size << endl;
 }
 
@@ -844,6 +870,7 @@ int main(int argc, char *argv[])
   sout << "time spent centring nodes: " << centring_time / 1000000<< endl;
   sout << "time spent collision checking: " << collision_check_time / 1000000<< endl;
   sout << "time spent checking duplications: " << duplication_check_time / 1000000<< endl;
+  sout << "time spent purging: " << test / 1000000<< endl;
   sout << endl;
   for(int i = 0; i < paths_count.size(); i++){
     sout << "tunnel "<<  i + 1 << " found in " << ((double)paths_count[i] / (double)get_current_frame())*100 << "% of tested frames" << endl;

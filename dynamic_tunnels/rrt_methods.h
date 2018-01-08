@@ -14,9 +14,11 @@ bool is_in_obstacle_custom_frame(double* loc_coord, double radius, int check_wit
 //bool is_in_obstacle(array<double, 3> loc_coord, double radius, int check_with_blocking_spheres);
 double approximate_radius(double* coordinates, double default_radius, double precision, double default_approximation_step);
 double approximate_radius_custom_frame(double* coordinates, double default_radius, double precision, double default_approximation_step, int frame);
-void cut_subtree_in_main_tree_recursion(shared_ptr<vertex> cur, bool has_debugging_output, bool is_local);
-void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debugging_output);
-void rebuild_kd_tree(bool is_initialized, int status, bool copy_stuff, bool only_valid_in_curframe);
+void cut_subtree_in_main_tree(shared_ptr<vertex> first_delet_node, bool has_debugging_output, bool is_nearest_neighbor_search_structure_rebuilt);
+void rebuild_kd_tree(bool is_initialized, bool copy_stuff, bool only_valid_in_curframe);
 int add_to_tree(double* loc_coord, int tree_index, MPNN::MultiANN<double>* kdTree);
 void build_tree(int is_global);
 bool test_path_noncolliding_static(shared_ptr<Path> tested_path);
+
+int print_colliding(std::map<int ,shared_ptr<vertex>>& map);
+void purge_nodes_in_blocking_spheres(shared_ptr<Path> optimizedTunnel);

@@ -4,7 +4,7 @@ from tabulate import tabulate
 import sys
 
 files_directory = "/home/fif/bak_repository/analysis/results/static/"
-cur_directory = "SAMPLING_BIAS_TEST/1TQN09/"
+cur_directory = "INSIDE_BIAS_TEST/1AKD/"
 reused = "REUSED/"
 reseted = "RESETED/"
 reseted_directory = files_directory + cur_directory + reseted
@@ -14,12 +14,12 @@ timeFile = "runtime.log"
 
 
 
-column1_directory = "00/"
-column2_directory = "00/"
-column3_directory = "25/"
-column4_directory = "25/"
-column5_directory = "50/"
-column6_directory = "50/"
+column1_directory = "0/"
+column2_directory = "0/"
+column3_directory = "0.25/"
+column4_directory = "0.25/"
+column5_directory = "0.5/"
+column6_directory = "0.5/"
 
 
 
@@ -108,17 +108,17 @@ def compute_tunnel_length(file):
 
 def convert_line(line_in):
 	line = line_in.split()
-	percentage = (float(line[5]) * 100)
-	return format(percentage, '.2f') + "%"
+	percentage = (float(line[5]))
+	return format(percentage, '.0f') + "%"
 
 def convert_last_line(line_in):
 	line = line_in.split()
-	percentage = (float(line[11]) * 100)
+	percentage = (float(line[11])* 100)
 	return format(percentage, '.2f') + "%"
 
 def return_percentage(line_in):
 	line = line_in.split()
-	return float(line[5]) * 100
+	return float(line[5]) 
 
 def print_lines(lines):
 	for line in lines:

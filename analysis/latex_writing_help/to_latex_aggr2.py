@@ -4,7 +4,7 @@ from tabulate import tabulate
 import sys
 
 files_directory = "/home/fif/bak_repository/analysis/results/static/"
-cur_directory = "SAMPLING_BIAS_TEST/1TQN09/"
+cur_directory = "INSIDE_BIAS_TEST/1TQN/"
 reused = "REUSED/"
 reseted = "RESETED/"
 reseted_directory = files_directory + cur_directory + reseted
@@ -14,12 +14,12 @@ timeFile = "runtime.log"
 
 
 
-column1_directory = "75/"
-column2_directory = "75/"
-column3_directory = "90/"
-column4_directory = "90/"
-column5_directory = "MORE_ITERATIONS_CROSS_TEST/300k/"
-column6_directory = "MORE_ITERATIONS_CROSS_TEST/300k/"
+column1_directory = "0.75/"
+column2_directory = "0.75/"
+column3_directory = "0.9/"
+column4_directory = "0.9/"
+column5_directory = "300kCROSSTEST/"
+column6_directory = "300kCROSSTEST/"
 
 
 
@@ -59,7 +59,7 @@ non_caver_lines = 4
 title_index = 2
 style = "\\begin{tabular}{|l|ll|ll|ll|}"
 title = "\\multicolumn{7}{|c|}{TITLE} \\\\"
-Another_title = "\\multicolumn{1}{|c|}{} & \\multicolumn{2}{c|}{0.75} & \\multicolumn{2}{|c|}{0.90} & \\multicolumn{2}{c|}{300k}\\\\"
+Another_title = "\\multicolumn{1}{|c|}{} & \\multicolumn{2}{c|}{0} & \\multicolumn{2}{|c|}{0.25} & \\multicolumn{2}{c|}{0.5}\\\\"
 table_header = [' caver tunnel n. ', 'reused ', 'reseted', 'reused ', 'reseted', 'reused ', 'reseted']
 
 
@@ -108,17 +108,17 @@ def compute_tunnel_length(file):
 
 def convert_line(line_in):
 	line = line_in.split()
-	percentage = (float(line[5]) * 100)
-	return format(percentage, '.2f') + "%"
+	percentage = (float(line[5]))
+	return format(percentage, '.0f') + "%"
 
 def convert_last_line(line_in):
 	line = line_in.split()
-	percentage = (float(line[11]) * 100)
+	percentage = (float(line[11])* 100)
 	return format(percentage, '.2f') + "%"
 
 def return_percentage(line_in):
 	line = line_in.split()
-	return float(line[5]) * 100
+	return float(line[5]) 
 
 def print_lines(lines):
 	for line in lines:
@@ -183,3 +183,6 @@ table_lines.insert(after_comparison_index, data_line)
 #----
 
 print_lines(table_lines)
+
+
+#print(tabulate(data_table, tablefmt="latex", floatfmt = ".2f"))

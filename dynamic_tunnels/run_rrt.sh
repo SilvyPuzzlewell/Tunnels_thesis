@@ -1,6 +1,6 @@
 #!/bin/bash
 cd ./found_tunnels
-for i in {0..100..1}
+for i in {0..99..1}
 do
 	echo $i
 	DIRECTORY="tunnels$i"
@@ -18,7 +18,7 @@ rm runtime_stats.txt
 date >> date_pre.log
 mv date_pre.log "found_tunnels/date_pre.log"
 rm time_log.log
-for i in {0..100..1}
+for i in {0..99..1}
 do
 	echo "iteration $i"
 	date >> time_log.log 
