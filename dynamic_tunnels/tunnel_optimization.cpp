@@ -476,7 +476,7 @@ bool search(shared_ptr<vertex> base, shared_ptr<vertex> target){
     cur = visited.front();
     visited.pop();
     counter++;
-    if(counter > 1000000){
+    if(counter > 10000000){
       cout << "STUCK" << endl;
       create_segfault();
     }
@@ -748,7 +748,14 @@ int center_tunnel(shared_ptr<Path> path){
   //cout << "center_tunnel: path_vertices size " << path_vertices.size() << endl;
   if(path->get_size() < 2) return -2;
 
+
+
   shared_ptr<vertex> cur_node = path->get_beginning_node()->get_child_pointer().lock();
+  double* direction_vector = add_vectors(path->get_beginning_node()->get_location_coordinates(),cur_node->get_location_coordinates(), SUBTRACTION);
+  center_node(path->get_beginning_node(), NULL, NULL, direction_vector, 0.5, false, true, false);
+  delete [] direction_vector;
+
+
   //shared_ptr<vertex> cur_node = path->get_endpoint_node();
 
   //path->print_path();
@@ -963,6 +970,8 @@ void path_optimization_postprocessing(shared_ptr<Path> path){
   //smooth_tunnel(path);
   //center_tunnel_without_erasing(path);
 
+
+  set_path_bottleneck(path);
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding pre post-processing!" <<endl;
       create_segfault();
@@ -975,6 +984,7 @@ void path_optimization_postprocessing(shared_ptr<Path> path){
     //cout << "path_size post" << path->get_size() << endl; 
   }
   while(success > SMOOTHING_SUCCESS_THRESHOLD);
+  set_path_length(path);
   if(!test_path_noncolliding_static(path)){
       cout << "path colliding post post-processing!" <<endl;
       create_segfault();

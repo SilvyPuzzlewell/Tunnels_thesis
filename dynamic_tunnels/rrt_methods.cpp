@@ -335,5 +335,54 @@ bool test_path_noncolliding_static(shared_ptr<Path> path){
   } 
 
   return true;
-} 
+}
+
+
+void set_path_bottleneck(shared_ptr<Path> path){
+  shared_ptr<vertex> cur = path->get_beginning_node();
+  shared_ptr<vertex> next = cur->get_child_pointer().lock();
+  double bottleneck = DBL_MAX;
+
+  while(true){
+
+    if(cur->get_radius() < bottleneck){
+      bottleneck = cur->get_radius();
+    }
+
+    if(next->get_index() == path->get_endpoint_index()){
+      if(next->get_radius() < bottleneck){
+        bottleneck = next->get_radius();
+      }
+      break;
+    }
+
+    cur = next;
+    next = next->get_child_pointer().lock();
+  } 
+
+  path->bottleneck = bottleneck;
+  cout << "bottleneck: " << bottleneck  << endl;
+}
+
+void set_path_length(shared_ptr<Path> path){
+
+  shared_ptr<vertex> cur = path->get_beginning_node();
+  shared_ptr<vertex> next = cur->get_child_pointer().lock();
+  double length = 0;
+  while(true){
+
+    length += compute_metric_eucleidean(cur->get_location_coordinates(), next->get_location_coordinates());
+
+    if(next->get_index() == path->get_endpoint_index()){
+      break;
+    }
+
+    cur = next;
+    next = next->get_child_pointer().lock();
+  } 
+  path->length = length;
+  cout << " length " << length << endl;
+}
+
+
  

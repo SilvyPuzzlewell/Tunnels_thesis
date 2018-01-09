@@ -158,6 +158,9 @@ class Path: public Tree {
   int endpoint_index;
   //---
  public:
+  double bottleneck;
+  double length;
+
   vector<double*> N_representation;
   shared_ptr<vertex> operator[](std::size_t idx); 
 

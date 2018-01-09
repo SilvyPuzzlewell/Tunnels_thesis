@@ -22,3 +22,6 @@ bool test_path_noncolliding_static(shared_ptr<Path> tested_path);
 
 int print_colliding(std::map<int ,shared_ptr<vertex>>& map);
 void purge_nodes_in_blocking_spheres(shared_ptr<Path> optimizedTunnel);
+
+void set_path_bottleneck(shared_ptr<Path> path);
+void set_path_length(shared_ptr<Path> path);

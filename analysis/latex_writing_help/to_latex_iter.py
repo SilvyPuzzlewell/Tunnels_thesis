@@ -4,9 +4,9 @@ from tabulate import tabulate
 import sys
 
 files_directory = "/home/fif/bak_repository/analysis/results/static/"
-cur_directory = "INSIDE_BIAS_TEST/1MXTa/"
-reused = "REUSED/"
-reseted = "RESETED/"
+cur_directory = "ITERATIONS_TEST/1AKD/"
+reused = ""
+reseted = ""
 reseted_directory = files_directory + cur_directory + reseted
 reused_directory = files_directory + cur_directory + reused
 planFile = "processed_stats_norm.txt"
@@ -14,12 +14,12 @@ timeFile = "runtime.log"
 
 
 
-column1_directory = "0/"
-column2_directory = "0/"
-column3_directory = "0.25/"
-column4_directory = "0.25/"
-column5_directory = "0.5/"
-column6_directory = "0.5/"
+column1_directory = "20000/"
+column2_directory = "50000/"
+column3_directory = "100000/"
+column4_directory = "200000/"
+column5_directory = "500000/"
+column6_directory = "1000000/"
 
 
 
@@ -53,14 +53,14 @@ column6_lines = column6_table.readlines()
 
 
 custom_style = True
-another_title = True
+another_title = False
 
 non_caver_lines = 4
 title_index = 2
-style = "\\begin{tabular}{|l|ll|ll|ll|}"
+style = "\\begin{tabular}{|l|l|l|l|l|l|l|}"
 title = "\\multicolumn{7}{|c|}{TITLE} \\\\"
 Another_title = "\\multicolumn{1}{|c|}{} & \\multicolumn{2}{c|}{0} & \\multicolumn{2}{|c|}{0.25} & \\multicolumn{2}{c|}{0.5}\\\\"
-table_header = [' caver tunnel n. ', 'reused ', 'reseted', 'reused ', 'reseted', 'reused ', 'reseted']
+table_header = [' caver tunnel n. ', '20000' , '50000', '100000','200000' , '500000 ','1000000']
 
 
 data_table = []
@@ -132,8 +132,8 @@ for line in column1_lines:
 	print(counter)
 	if line[0] == "tunnel_num":
 
-		if (return_percentage(column1_lines[counter]) != 0 or return_percentage(column2_lines[counter]) != 0 or return_percentage(column3_lines[counter]) != 0 
-		or return_percentage(column4_lines[counter]) != 0 or return_percentage(column5_lines[counter]) != 0 or return_percentage(column6_lines[counter]) != 0):
+		if (return_percentage(column1_lines[counter]) != 50 or return_percentage(column2_lines[counter]) != 50 or return_percentage(column3_lines[counter]) != 50 
+		or return_percentage(column4_lines[counter]) != 50 or return_percentage(column5_lines[counter]) != 50 or return_percentage(column6_lines[counter]) != 50):
 			caver_tunnel_length = compute_tunnel_length(line[1])
 			data_line = [line[1] + " ( " + format(caver_tunnel_length, '.2f') + " ) ", 
 			convert_line(column1_lines[counter]), 

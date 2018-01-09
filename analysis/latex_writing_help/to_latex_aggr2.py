@@ -4,7 +4,7 @@ from tabulate import tabulate
 import sys
 
 files_directory = "/home/fif/bak_repository/analysis/results/static/"
-cur_directory = "INSIDE_BIAS_TEST/1TQN/"
+cur_directory = "INSIDE_BIAS_TEST/1MXTa/"
 reused = "REUSED/"
 reseted = "RESETED/"
 reseted_directory = files_directory + cur_directory + reseted
@@ -18,8 +18,8 @@ column1_directory = "0.75/"
 column2_directory = "0.75/"
 column3_directory = "0.9/"
 column4_directory = "0.9/"
-column5_directory = "300kCROSSTEST/"
-column6_directory = "300kCROSSTEST/"
+column5_directory = "300k/"
+column6_directory = "300k/"
 
 
 
@@ -59,7 +59,7 @@ non_caver_lines = 4
 title_index = 2
 style = "\\begin{tabular}{|l|ll|ll|ll|}"
 title = "\\multicolumn{7}{|c|}{TITLE} \\\\"
-Another_title = "\\multicolumn{1}{|c|}{} & \\multicolumn{2}{c|}{0} & \\multicolumn{2}{|c|}{0.25} & \\multicolumn{2}{c|}{0.5}\\\\"
+Another_title = "\\multicolumn{1}{|c|}{} & \\multicolumn{2}{c|}{0.75} & \\multicolumn{2}{|c|}{0.9} & \\multicolumn{2}{c|}{300k}\\\\"
 table_header = [' caver tunnel n. ', 'reused ', 'reseted', 'reused ', 'reseted', 'reused ', 'reseted']
 
 
@@ -113,7 +113,9 @@ def convert_line(line_in):
 
 def convert_last_line(line_in):
 	line = line_in.split()
-	percentage = (float(line[11])* 100)
+	percentage = 0
+	if len(line) > 8:
+		percentage = (float(line[11])* 100)
 	return format(percentage, '.2f') + "%"
 
 def return_percentage(line_in):
